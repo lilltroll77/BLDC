@@ -1,0 +1,19 @@
+// Copyright (c) 2016, XMOS Ltd, All rights reserved
+
+#include <platform.h>
+#include <xs1.h>
+#include "xud_cdc.h"
+
+
+/* Application task */
+void app_virtual_com_extended(client interface usb_cdc_interface cdc)
+{
+    timer tmr;
+    int t;
+    tmr :> t;
+        while(1){
+            cdc.available_bytes();
+            tmr when timerafter(t+1e6):>t;
+
+        }
+}
