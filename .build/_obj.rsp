@@ -1,1 +1,0 @@
-..\.build\src\BLDC.xc.o ..\.build\src\FOC.xc.o ..\.build\src\QE.xc.o ..\.build\src\SVM.xc.o ..\.build\src\decimate.xc.o ..\.build\src\pwm.xc.o ..\.build\src\spi.xc.o ..\.build\src\svpwm.xc.o ..\.build\src\wait.xc.o
