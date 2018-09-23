@@ -2,7 +2,7 @@
  * decimate.xc
  *
  *  Created on: 23 sep 2018
- *      Author: micke
+ *      Author: Mikael Bohman
  */
 #include <xs1.h>
 #include <xclib.h>

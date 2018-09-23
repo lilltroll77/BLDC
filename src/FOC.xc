@@ -72,6 +72,11 @@ void FOC(streaming chanend c_I[2] , streaming chanend c_fi , streaming chanend c
         c_FIFO <: Id;
         c_FIFO <: Iq;
 
+        {Id , Id_lo} = macs(Ahi , cos_fi , 0 , 0);
+        {Id , Id_lo} = macs(Bhi , sin_fi , Id , Id_lo);
+
+
+
 
     }
 

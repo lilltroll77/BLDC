@@ -2,7 +2,7 @@
  * QE.xc
  *
  *  Created on: 21 sep 2018
- *      Author: micke
+ *      Author: Mikael Bohman
  */
 
 #include "xs1.h"
