@@ -2,7 +2,7 @@
  * svm.h
  *
  *  Created on: 22 sep 2018
- *      Author: micke
+ *      Author: Mikael Bohman
  */
 #ifndef SVM_H_
 #define SVM_H_

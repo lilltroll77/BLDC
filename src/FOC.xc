@@ -2,7 +2,7 @@
  * FOC.xc
  *
  *  Created on: 23 sep 2018
- *      Author: micke
+ *      Author: Mikael Bohman
  */
 
 #include "svm.h"
@@ -45,8 +45,7 @@ void FOC(streaming chanend c_I[2] , streaming chanend c_fi , streaming chanend c
 
         c_t c={1431655765 , -1431655765/2 , 1239850262};
 
-          // 3to2 transform
-
+        // 3 to 2 transform
 
         int Ahi , Bhi;
         unsigned Alo , Blo;

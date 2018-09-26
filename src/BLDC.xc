@@ -2,7 +2,7 @@
  * BLDC.xc
  *
  *  Created on: 11 sep 2018
- *      Author: micke
+ *      Author: Mikael Bohman
  */
 
 #include <platform.h>
@@ -11,11 +11,15 @@
 #include "print.h"
 #include <xscope.h>
 #include "typedefs.h"
-#include "spi.h"
+#include "supervisor.h"
+#include "usb.h"
+#include "xud_cdc.h"
+
+
 
 //#include "math.h"
-//#include "usb.h"
-//#include "xud_cdc.h"
+
+
 //#include "app_virtual_com_extended.h"
 #include "svm.h"
 #include "ports.h"
@@ -67,32 +71,38 @@ void control(streaming chanend c_in , streaming chanend c_out , streaming chanen
 }
 
 void microFIFO(streaming chanend c){
+    set_core_high_priority_off();
     int val1,val2;
     while(1){
         c:> val1;
         xscope_int(I_D, val1);
         c:> val2;
-        xscope_int(I_Q, val1-val2);
+        xscope_int(I_Q, val2);
     }
 }
 
 int main(){
     streaming chan c_Idata[2], c_pwm , c_QE, c_FOC;
     streaming chan c_svm, c_FIFO;
-    //chan c_ep_out[XUD_EP_COUNT_OUT], c_ep_in[XUD_EP_COUNT_IN];
-//    interface usb_cdc_interface cdc_data[2];
+    chan c_ep_out[XUD_EP_COUNT_OUT], c_ep_in[XUD_EP_COUNT_IN];
+    interface usb_cdc_interface cdc_data[2];
+    interface GUI_supervisor_interface supervisor_data;
+
     par{
-/*
+
         on USB_TILE: xud(c_ep_out, XUD_EP_COUNT_OUT, c_ep_in, XUD_EP_COUNT_IN,
                 null, XUD_SPEED_HS, XUD_PWR_SELF);
         on USB_TILE: Endpoint0(c_ep_out[0], c_ep_in[0]);
-        on USB_TILE: CdcEndpointsHandler(c_ep_in[1], c_ep_out[1], c_ep_in[2], cdc_data[0]);
-        on USB_TILE: CdcEndpointsHandler(c_ep_in[3], c_ep_out[2], c_ep_in[4], cdc_data[1]);
-        on USB_TILE: app_virtual_com_extended(cdc_data[0]);
-        on USB_TILE: app_virtual_com_extended(cdc_data[1]);
-*/
+        on USB_TILE: CdcEndpointsHandler(c_ep_in[CDC_NOTIFICATION_EP_NUM1], c_ep_out[CDC_DATA_RX_EP_NUM1], c_ep_in[CDC_DATA_TX_EP_NUM1], cdc_data[0]);
+        on USB_TILE: CdcEndpointsHandler(c_ep_in[CDC_NOTIFICATION_EP_NUM2], c_ep_out[CDC_DATA_RX_EP_NUM2], c_ep_in[CDC_DATA_TX_EP_NUM2], cdc_data[1]);
+        on USB_TILE: [[combine]] par{
+                     GUIhandler(cdc_data[0] , supervisor_data);
+                     GCODEhandler(cdc_data[1]);
+        }
+        //on USB_TILE: app_virtual_com_extended(cdc_data[1]);
+
         on tile[1]:  QE(c_QE , QE_r.A , QE_r.B , QE_r.X);
-        on tile[1]:  microFIFO(c_FIFO);
+        on tile[0]:  microFIFO(c_FIFO);
         on tile[0]:{
 
             set_clock_div(spi_r.clkblk , 500); // 1MHz
@@ -121,7 +131,8 @@ int main(){
                 FOC(c_Idata , c_QE ,c_FOC , c_FIFO);
                 SVM( c_FOC , c_svm );
                 svpwm(c_svm , clk_pwm  ,p_svpwm );
-                supervisor(p_button , p_fault , spi_r);
+                supervisor_cores(supervisor_data , p_button , p_fault , spi_r , p_SCL);
+
                 }
 
             } // tile[0]

@@ -15,9 +15,10 @@
 <!-- ======================================================= -->
 <!--Probe name="PROBE_ANGLE" type="DISCRETE" datatype="INT" units="steps" enabled="true"/-->
 
-<xSCOPEconfig ioMode="none" enabled="true">
+<xSCOPEconfig ioMode="basic" enabled="true">
     <Probe name="PROBE_ANGLE" type="DISCRETE" datatype="INT" units="steps" enabled="true"/>
     <Probe name="I_D" type="CONTINUOUS" datatype="INT" units="CLK" enabled="true"/>
     <Probe name="I_Q" type="CONTINUOUS" datatype="INT" units="CLK" enabled="true"/>
+    <Probe name="GUI" type="DISCRETE" datatype="INT" units="CLK" enabled="true"/>
 </xSCOPEconfig>
 

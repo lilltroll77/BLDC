@@ -2,7 +2,7 @@
  * typedefs.h
  *
  *  Created on: 23 sep 2018
- *      Author: micke
+ *      Author: Mikael Bohman
  */
 
 
@@ -53,5 +53,6 @@ typedef struct{
      const int m_oneThird;
      const int pow_Third;
  }c_t;
+
 
 #endif /* TYPEDEFS_H_ */
