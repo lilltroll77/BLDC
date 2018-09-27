@@ -7,6 +7,7 @@
 #include "xud_cdc.h"
 #include "print.h"
 #include "xscope.h"
+#include "supervisor.h"
 
 extern void wait(unsigned clk);
 
@@ -18,11 +19,39 @@ void printDec(short data){
     printint(data%10);
 }
 
+enum COMMAND{COM_STOP, COM_DRV , COM_NEWTEMP};
+
 [[combinable]] void GUIhandler(client interface usb_cdc_interface cdc , client interface GUI_supervisor_interface supervisor){
     set_core_high_priority_off();
     short data[BUFF_LEN];
     while(1){
         select{
+        case supervisor.data_waiting():
+            int info = supervisor.getInfo();
+            if(info &COM_DRV){ // Send all status reg to GUI
+            int i=0;
+                for(i=0; i <=2 ; i++){
+                data[2+i] = supervisor.readGateDriver(i);
+                unsigned len=2+i*2;
+                (data , char[])[0]=len;
+                (data , char[])[1]=COM_DRV;
+                cdc.write((data , char[]) , len);
+                }
+            }
+            if( info &SHUTDOWN ){
+                unsigned len=2;
+                (data , char[])=len;
+                (data , char[])=COM_STOP;
+                cdc.write((data , char[]) , len);
+            }
+            if( info &TEMP_CHANGED ){
+                unsigned len=2 + 1;
+                data[1]=supervisor.readTemperature();
+                (data , char[])=len;
+                (data , char[])=COM_STOP;
+                cdc.write((data , char[]) , len);
+            }
+            break;
         case cdc.data_ready():
             unsigned bytes;
             do{
