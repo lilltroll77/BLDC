@@ -68,9 +68,12 @@ void SVM(streaming chanend c_in , streaming chanend c_out ){
 */
 
     c_in :>int _;
+    unsigned counter=0;
 #pragma unsafe arrays
     while(1){
-        angle++;
+        counter++;
+        if((counter & 0xF)==0)
+            angle++;
 
         if(angle<0)
             angle += (6*SIN_TBL_LEN);

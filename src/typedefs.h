@@ -54,5 +54,13 @@ typedef struct{
      const int pow_Third;
  }c_t;
 
-
+typedef struct{
+    int A;
+    int B;
+    int C;
+    unsigned max;
+    unsigned fuse;
+    unsigned overcurrent;
+    unsigned release_time;
+}current_t;
 #endif /* TYPEDEFS_H_ */

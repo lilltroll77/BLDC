@@ -13,6 +13,7 @@
 #define QE_RES 8192
 
 void QE(streaming chanend c , in port pA , in port pB , in port pX){
+    set_core_high_priority_off();
     int sin_tb[QE_RES];
     for(int i=0; i<QE_RES ; i++)
         sin_tb[i]=(double)0x7FFFFFFF*sin(2*M_PI *(double)i/QE_RES);
@@ -20,7 +21,7 @@ void QE(streaming chanend c , in port pA , in port pB , in port pX){
     int A,B=0;
     int angle=0*QE_RES/8;
     timer tmr;
-    int t;
+    unsigned t;
     pX when pinseq(0):>void;
     pX when pinseq(1):>void;
 

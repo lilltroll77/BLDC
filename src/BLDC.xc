@@ -33,7 +33,7 @@
 
 
 extern void QE(streaming chanend c_out , in port pA , in port pB , in port pX);
-extern void FOC(streaming chanend c_I[2] , streaming chanend c_fi , streaming chanend c_out, streaming chanend c_FIFO);
+extern void FOC(streaming chanend c_I[2] , streaming chanend c_fi , streaming chanend c_out, streaming chanend c_FIFO ,streaming chanend c_supervisor , current_t &I );
 extern void decimate64(streaming chanend c , in buffered port:32 p);
 extern void wait(unsigned clk);
 
@@ -83,7 +83,7 @@ void microFIFO(streaming chanend c){
 
 int main(){
     streaming chan c_Idata[2], c_pwm , c_QE, c_FOC;
-    streaming chan c_svm, c_FIFO;
+    streaming chan c_svm, c_FIFO , c_FOC2Sup;
     chan c_ep_out[XUD_EP_COUNT_OUT], c_ep_in[XUD_EP_COUNT_IN];
     interface usb_cdc_interface cdc_data[2];
     interface GUI_supervisor_interface supervisor_data;
@@ -124,16 +124,18 @@ int main(){
             configure_out_port(p_svpwm ,clk_pwm ,0 );
 
             init_TIdriver(spi_r);
-
+            current_t I;
+            unsafe{current_t* unsafe Iptr = &I;
             par{
                 decimate64(c_Idata[0] , DS.DATA_A);
                 decimate64(c_Idata[1] , DS.DATA_C);
-                FOC(c_Idata , c_QE ,c_FOC , c_FIFO);
+                FOC(c_Idata , c_QE ,c_FOC , c_FIFO , c_FOC2Sup , I);
                 SVM( c_FOC , c_svm );
                 svpwm(c_svm , clk_pwm  ,p_svpwm );
-                supervisor_cores(supervisor_data , p_button , p_fault , spi_r , p_SCL);
+                supervisor_cores(supervisor_data , c_FOC2Sup , p_button , p_fault , spi_r , p_SCL , Iptr);
 
                 }
+            }
 
             } // tile[0]
 

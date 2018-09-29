@@ -62,12 +62,16 @@ void init_TIdriver( SPI_t &spi_r){
     //WriteToDRV8320S( 0x3 , 0x300 , spi_r); // OCP PWM3
     unsigned reg[] = {0 , 0 , 0 , 0x312, 0x712 , 0x19};
 
-    for(int addr=3 ; addr<=5 ; addr++){
+    for(int addr=0; addr<=5 ; addr++){
         int data=reg[addr];
         WriteToDRV8320S( addr , data , spi_r); // OCP PWM3
         int readback = ReadFromDRV8320S(addr , spi_r);
         if(readback != data)
             printstrln("Error in SPI com. to TI gatedriver");
+#if(DEBUG)
+        else
+            printintln(readback);
+#endif
     }
 }
 
@@ -143,32 +147,43 @@ short convert_and_read_scratch(client one_wire_if i_one_wire, unsigned char data
   i_one_wire.start_read_bytes(9);
   wait_for_completion(i_one_wire);
   i_one_wire.get_read_bytes(data, 9);
-  return(data[0] | ((unsigned)data[1] << 8));
+  return (data[0] | ((short)data[1] << 8));
 }
 
-enum message{SHUTDOWN=1 , DRV_ERROR=2 , TEMP_CHANGED=4};
 
-[[combinable]]void supervisor(server interface GUI_supervisor_interface supervisor_data , client interface one_wire_if termometer_data , in port p_button , in port p_fault , SPI_t &spi_r ){
+unsafe void supervisor(server interface GUI_supervisor_interface supervisor_data , client interface one_wire_if termometer_data , streaming chanend c_FOC , in port p_button , in port p_fault , SPI_t &spi_r ,  current_t * unsafe I ){
     set_core_high_priority_off();
+    I->fuse = 0xFFFFFFFF;
+
     int button;
     unsigned char data[9] = {0};
     p_button :> button;
-    int t;
+    unsigned t;
     timer tmr;
     short temp=0;
     char info=0;
+    tmr :> t;
+
     while(1){
+        char ct;
         select{
+        case sinct_byref(c_FOC, ct):
+        spi_r.CTRL <: 2;
+        info |= OVER_CURRENT;
+        supervisor_data.data_waiting();
+        printstr("OVERCURRENT");
+        break;
         case p_button when pinsneq(button):>button:
             if((button&1)==0 ){
-                spi_r.CTRL <: 0;
+                spi_r.CTRL <:2;
                 printstr("SHUTDOWN");
                 info |= SHUTDOWN;
                 supervisor_data.data_waiting();
+                while(1);
             }
             break;
         case p_fault when pinseq(0):>void:
-
+            spi_r.CTRL <: 2;
             printstrln("DRV ERROR");
             for(int addr=0 ; addr<=5 ; addr++){
                 int miso = ReadFromDRV8320S(addr , spi_r);
@@ -177,46 +192,55 @@ enum message{SHUTDOWN=1 , DRV_ERROR=2 , TEMP_CHANGED=4};
                 printhexln(miso);
                 info |=DRV_ERROR;
             }
-            spi_r.CTRL <: 0;
+
             supervisor_data.data_waiting();
             break;
-        case tmr when timerafter(1e8 + t):>t:
-                short new_temp =  convert_and_read_scratch(termometer_data, data);
-                if(new_temp != temp){
+        case tmr when timerafter(5e7 + t):>void:
+                short new_temp  =  convert_and_read_scratch(termometer_data, data);
+                tmr:>t;
+                if(new_temp != temp) {
                     temp = new_temp;
                     supervisor_data.data_waiting();
+                    info |=TEMP_CHANGED;
                 }
-                info |=TEMP_CHANGED;
                 break;
-
+        case supervisor_data.setMaxCurrent(unsigned current):
+            I->max = current;
+            break;
+        case supervisor_data.readCurrent(int reset) -> unsigned current:
+                if(reset)
+                    I->overcurrent=0;
+                current = I->max;
+                break;
         case supervisor_data.readTemperature(char ID) -> short temperature:
                 info &=!TEMP_CHANGED;
                 temperature = temp;
-            break;
+                break;
         case supervisor_data.readGateDriver(char reg) -> short data_reg:
                 info |=!DRV_ERROR;
-                data_reg=0;
-            break;
+                data_reg=ReadFromDRV8320S(reg , spi_r);
+                break;
         case supervisor_data.writeGateDriver(char reg , short val) -> int ack:
                 ack=1;
                 break;
         case supervisor_data.getInfo() -> int new_info:
                 new_info = info;
+                info=0;
                 break;
         case supervisor_data.resetGateDriver() -> int ack:
-               ack=1;
+                ack=1;
                 break;
-        }
+        }//select
     }
 
 }
 
 
 
-void supervisor_cores(server interface GUI_supervisor_interface supervisor_data , in port p_button , in port p_fault , SPI_t &spi_r , port p_temp){
+unsafe void supervisor_cores(server interface GUI_supervisor_interface supervisor_data , streaming chanend c_FOC , in port p_button , in port p_fault , SPI_t &spi_r , port p_temp ,  current_t * unsafe I){
     interface one_wire_if termometer_data;
     par{
            one_wire(termometer_data, p_temp);
-           supervisor(supervisor_data , termometer_data , p_button ,p_fault , spi_r);
+           supervisor(supervisor_data , termometer_data, c_FOC , p_button ,p_fault , spi_r , I);
        }
 }

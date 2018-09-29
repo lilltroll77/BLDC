@@ -9,7 +9,7 @@
 
 void wait(unsigned clk){
     timer tmr;
-    int t;
+    unsigned t;
     tmr:>t;
     tmr when timerafter(t + clk):>int _;
 }

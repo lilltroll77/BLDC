@@ -7,12 +7,12 @@
 #define PRESENCE_SAMPLE_TICKS     6800        //Earliest it comes is 60us and earliest it goes is 75us so set halfway
 
 #define SLOT_TIME_TICKS           8000        //80us
-#define RECOVERY_TIME_TICKS        100        //1us
+#define RECOVERY_TIME_TICKS       200        //1us min
 
 #define WRITE_0_RELEASE_TICKS     6000        //60us. note must be less than SLOT_TIME_TICKS else write 0 will not release
-#define WRITE_1_RELEASE_TICKS      100        //1us
+#define WRITE_1_RELEASE_TICKS     200        //1us min
 
-#define READ_ASSERT_TICKS          100        //1us
+#define READ_ASSERT_TICKS         200        //1us min
 #define READ_SAMPLE_TICKS         1400        //14us
 
 #if (WRITE_0_RELEASE_TICKS >= SLOT_TIME_TICKS)

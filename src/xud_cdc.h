@@ -31,6 +31,8 @@ interface GUI_supervisor_interface{
     [[guarded]] short readGateDriver(char reg);
     [[guarded]] int writeGateDriver(char reg , short data);
     [[guarded]] int resetGateDriver();
+    [[guarded]] unsigned readCurrent(int reset);
+    [[guarded]] void setMaxCurrent(unsigned current);
 };
 
 interface usb_cdc_interface {

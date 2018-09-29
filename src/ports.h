@@ -18,7 +18,7 @@ on tile[0]:in port p_fault = XS1_PORT_1L;
 on tile[0]:clock clk_pwm =  XS1_CLKBLK_2;
 on tile[0]:SPI_t spi_r={XS1_PORT_1J , XS1_PORT_1K , XS1_PORT_1I , XS1_PORT_4F ,  XS1_CLKBLK_1};
 on tile[1]:QE_t QE_r={XS1_PORT_1L , XS1_PORT_1O , XS1_PORT_1P};
-on tile[0]:port p_SCL = XS1_PORT_1F;
+on tile[0]:port p_SCL = XS1_PORT_1E;
 
 
 #endif /* PORTS_H_ */
