@@ -69,12 +69,23 @@ void SVM(streaming chanend c_in , streaming chanend c_out ){
 
     c_in :>int _;
     unsigned counter=0;
+    unsigned angle_set=1;
 #pragma unsafe arrays
+    int fi1=0;
     while(1){
-        counter++;
-        if((counter & 0xF)==0)
+        angle++;
+        /*
+        counter = (counter+1);
+        if(counter==0){
             angle++;
+            //xscope_int(ANGLE, sin_tb[fi1]);
+        }else if(counter==1){
+            angle_set--;
+            if(angle_set == 0)
+                angle_set = 8192*6;
+        }
 
+*/
         if(angle<0)
             angle += (6*SIN_TBL_LEN);
         else if(angle>= (6*SIN_TBL_LEN) )
@@ -87,7 +98,7 @@ void SVM(streaming chanend c_in , streaming chanend c_out ){
 
         int next_sector = sector+1;
         svm[buffer].p2 = lut[next_sector];
-        int fi1 = (next_sector<<SIN_TBL_BITS) - angle;
+         fi1 = (next_sector<<SIN_TBL_BITS) - angle;
 
 
         if((amp<0x7000) && buffer)//0x7000
@@ -119,15 +130,6 @@ void SVM(streaming chanend c_in , streaming chanend c_out ){
         svm[buffer].t_before = svm[buffer].t0>>1;
         svm[buffer].t_after = svm[buffer].t0 - svm[buffer].t_before;
 
-        //xscope_short(PROBE_T0, svm[buffer].t0);
-        //xscope_short(PROBE_T1, svm[buffer].t1);
-        //xscope_short(PROBE_T2, svm[buffer].t2);
-        /*
-        xscope_int(PROBE_ANGLE, alfa);
-        xscope_int(PROBE_FI1, fi1);
-        xscope_int(PROBE_FI2, fi2);
-*/
-        //xscope_int(PROBE_ANGLE, alfa);
         unsafe{
             svm_t * unsafe ptr = &svm[buffer];
             //printchar('.');
@@ -135,11 +137,5 @@ void SVM(streaming chanend c_in , streaming chanend c_out ){
         }
         buffer = !buffer;
 
-
-
     }
 }
-//svm[buffer].p = (lut[sector]) | (lut[sector]<<16) | (lut[next_sector]<<8);
- //(svm[buffer].p , char[])[1] = lut[sector];
- //(svm[buffer].p , char[])[3] = lut[sector];
- //(svm[buffer].p , char[])[2] = lut[next_sector];

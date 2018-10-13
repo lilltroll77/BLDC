@@ -468,7 +468,8 @@ void CdcEndpointsHandler(chanend c_epint_in, chanend c_epbulk_out, chanend c_epb
       select
       {
         case XUD_GetData_Select(c_epbulk_out, epbulk_out, length, result):
-
+       //         printstr("XUD: ");
+       //         printintln(length);
            if(result == XUD_RES_OKAY)
            {
                /* Received some data */
@@ -486,10 +487,12 @@ void CdcEndpointsHandler(chanend c_epint_in, chanend c_epbulk_out, chanend c_epb
                     * Say that another buffer is also waiting to be read */
                    readWaiting = 1;
                }
-               cdc.data_ready();
+
            } else {
                XUD_SetReady_Out(epbulk_out, rxBuf[!readBufId]);
            }
+        //if(rxLen[0]>=HEADER_SIZE || rxLen[1]>=HEADER_SIZE)
+        //    cdc.data_ready();
            break;
 
         case XUD_SetData_Select(c_epbulk_in, epbulk_in, result):
@@ -583,6 +586,9 @@ void CdcEndpointsHandler(chanend c_epint_in, chanend c_epbulk_out, chanend c_epb
 
         case cdc.available_bytes() -> int count:
             count = rxLen[readBufId];
+            break;
+
+        case cdc.data_empty(): // clears notification
             break;
 
         case cdc.flush_buffer():

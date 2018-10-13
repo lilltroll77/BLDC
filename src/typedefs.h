@@ -16,6 +16,7 @@ typedef struct{
     out buffered port:32 CLK;
     out port CTRL;
     clock clkblk;
+    int ctrl_val;
 }SPI_t;
 
 typedef struct{
@@ -47,6 +48,8 @@ typedef struct{
 }svm_t;
 
 typedef int long long s64;
+typedef unsigned long long u64;
+typedef unsigned u32;
 
 typedef struct{
      const int twoThird;
@@ -55,12 +58,15 @@ typedef struct{
  }c_t;
 
 typedef struct{
-    int A;
-    int B;
-    int C;
-    unsigned max;
-    unsigned fuse;
-    unsigned overcurrent;
-    unsigned release_time;
+    int power;
+    int powerLP;
+    int Af;
+    int Bf;
+    unsigned long long max_current;
+    unsigned long long time_constant;
+    unsigned fuse_current;
+    unsigned overcurrent_holdValue;
+    int overcurrent;
 }current_t;
+
 #endif /* TYPEDEFS_H_ */

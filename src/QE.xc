@@ -12,14 +12,14 @@
 
 #define QE_RES 8192
 
-void QE(streaming chanend c , in port pA , in port pB , in port pX){
+void QE(streaming chanend c , streaming chanend c_FIFO , in port pA , in port pB , in port pX){
     set_core_high_priority_off();
     int sin_tb[QE_RES];
     for(int i=0; i<QE_RES ; i++)
         sin_tb[i]=(double)0x7FFFFFFF*sin(2*M_PI *(double)i/QE_RES);
 
     int A,B=0;
-    int angle=0*QE_RES/8;
+    int angle=7*QE_RES/8;
     timer tmr;
     unsigned t;
     pX when pinseq(0):>void;
@@ -28,7 +28,7 @@ void QE(streaming chanend c , in port pA , in port pB , in port pX){
     //printchar('X');
     char token;
     while(1){
-        tmr when timerafter(t + 100):>void; // debounce
+        tmr when timerafter(t + 50):>void; // debounce
         select{
         case pA when pinsneq(A) :> A:
             pB :> B;
@@ -37,8 +37,8 @@ void QE(streaming chanend c , in port pA , in port pB , in port pX){
                 angle = B ? angle-1 : angle+1;
             else // negedge
                 angle = B ? angle+1 : angle-1;
-            xscope_int(PROBE_ANGLE , angle & (QE_RES-1));
-            break;
+             c_FIFO <: angle;
+             break;
         case pB when pinsneq(B) :> B:
             pA :> A;
             tmr:> t;
@@ -46,7 +46,7 @@ void QE(streaming chanend c , in port pA , in port pB , in port pX){
                 angle = A ? angle+1 : angle-1;
             else // negedge
                 angle = A ? angle-1 : angle+1;
-            xscope_int(PROBE_ANGLE , angle & (QE_RES-1));
+            c_FIFO <: angle;
             break;
         case c :> int _:
                int a = angle & (QE_RES-1);

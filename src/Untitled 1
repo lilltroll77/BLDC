@@ -1,0 +1,13 @@
+    <Probe name="GUI" type="DISCRETE" datatype="INT" units="CLK" enabled="false"/>
+    <Probe name="I_PHASE_A" type="CONTINUOUS" datatype="INT" units="CLK" enabled="false"/>
+    <Probe name="I_PHASE_B" type="CONTINUOUS" datatype="INT" units="CLK" enabled="false"/>
+    <Probe name="I_PHASE_C" type="CONTINUOUS" datatype="INT" units="CLK" enabled="false"/>
+    <Probe name="I_POWER_LOWPASS" type="CONTINUOUS" datatype="INT" units="CLK" enabled="false"/>
+    <Probe name="I_PEAK" type="CONTINUOUS" datatype="INT" units="CLK" enabled="false"/>
+    <Probe name="PROBE_ANGLE" type="DISCRETE" datatype="INT" units="steps" enabled="false"/>
+    
+        <Probe name="Angle" 	type="CONTINUOUS" datatype="UINT" units="CLK" enabled="false"/>
+    <Probe name="QEangle" 	type="CONTINUOUS" datatype="UINT" units="CLK" enabled="false"/>
+    <Probe name="I phaseA" 	type="CONTINUOUS" datatype="INT" units="CLK" enabled="false"/>
+    <Probe name="I phaseB" 	type="CONTINUOUS" datatype="INT" units="CLK" enabled="false"/>
+    <Probe name="I phaseC" 	type="CONTINUOUS" datatype="INT" units="CLK" enabled="false"/>

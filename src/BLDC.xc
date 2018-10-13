@@ -14,6 +14,7 @@
 #include "supervisor.h"
 #include "usb.h"
 #include "xud_cdc.h"
+#include "deciamte.h"
 
 
 
@@ -32,9 +33,8 @@
 
 
 
-extern void QE(streaming chanend c_out , in port pA , in port pB , in port pX);
-extern void FOC(streaming chanend c_I[2] , streaming chanend c_fi , streaming chanend c_out, streaming chanend c_FIFO ,streaming chanend c_supervisor , current_t &I );
-extern void decimate64(streaming chanend c , in buffered port:32 p);
+extern void QE(streaming chanend c_out, streaming chanend c_FIFO , in port pA , in port pB , in port pX);
+extern void FOC(streaming chanend c_I[2] , streaming chanend c_fi , streaming chanend c_out, streaming chanend c_FIFO ,streaming chanend c_supervisor );
 extern void wait(unsigned clk);
 
 
@@ -70,29 +70,37 @@ void control(streaming chanend c_in , streaming chanend c_out , streaming chanen
     }
 }
 
-void microFIFO(streaming chanend c){
+//Used for latency hiding of non streaming channel with "low bandwidth" between XTAG and XMOS
+void microFIFO(streaming chanend c_QE , streaming chanend c_FOC){
     set_core_high_priority_off();
-    int val1,val2;
+    int data;
     while(1){
-        c:> val1;
-        xscope_int(I_D, val1);
-        c:> val2;
-        xscope_int(I_Q, val2);
+        select{
+            case c_QE:> data:
+                    xscope_int(QEANGLE , data & (8192-1));
+                break;
+            case c_FOC:> data:
+                    xscope_int(FLUXPROBE , data);
+                    c_FOC:> data;
+                    xscope_int(TQPROBE   , data);
+            break;
+        }
     }
 }
 
+
 int main(){
-    streaming chan c_Idata[2], c_pwm , c_QE, c_FOC;
-    streaming chan c_svm, c_FIFO , c_FOC2Sup;
+    streaming chan c_Idata[2] , c_slowIdata[2], c_pwm , c_QE, c_FOC;
+    streaming chan c_svm, c_FIFO2QE , c_FIFO2FOC , c_FOC2Sup , c_DEC2Sup;
     chan c_ep_out[XUD_EP_COUNT_OUT], c_ep_in[XUD_EP_COUNT_IN];
     interface usb_cdc_interface cdc_data[2];
     interface GUI_supervisor_interface supervisor_data;
 
     par{
 
-        on USB_TILE: xud(c_ep_out, XUD_EP_COUNT_OUT, c_ep_in, XUD_EP_COUNT_IN,
-                null, XUD_SPEED_HS, XUD_PWR_SELF);
-        on USB_TILE: Endpoint0(c_ep_out[0], c_ep_in[0]);
+        on USB_TILE: {set_core_high_priority_on();xud(c_ep_out, XUD_EP_COUNT_OUT, c_ep_in, XUD_EP_COUNT_IN,
+                null, XUD_SPEED_HS, XUD_PWR_SELF);}
+        on USB_TILE: {set_core_high_priority_on();Endpoint0(c_ep_out[0], c_ep_in[0]);}
         on USB_TILE: CdcEndpointsHandler(c_ep_in[CDC_NOTIFICATION_EP_NUM1], c_ep_out[CDC_DATA_RX_EP_NUM1], c_ep_in[CDC_DATA_TX_EP_NUM1], cdc_data[0]);
         on USB_TILE: CdcEndpointsHandler(c_ep_in[CDC_NOTIFICATION_EP_NUM2], c_ep_out[CDC_DATA_RX_EP_NUM2], c_ep_in[CDC_DATA_TX_EP_NUM2], cdc_data[1]);
         on USB_TILE: [[combine]] par{
@@ -101,8 +109,8 @@ int main(){
         }
         //on USB_TILE: app_virtual_com_extended(cdc_data[1]);
 
-        on tile[1]:  QE(c_QE , QE_r.A , QE_r.B , QE_r.X);
-        on tile[0]:  microFIFO(c_FIFO);
+     //   on tile[1]:  QE(c_QE , c_FIFO2QE ,QE_r.A , QE_r.B , QE_r.X);
+     //   on tile[1]:  microFIFO(c_FIFO2QE , c_FIFO2FOC);
         on tile[0]:{
 
             set_clock_div(spi_r.clkblk , 500); // 1MHz
@@ -124,15 +132,16 @@ int main(){
             configure_out_port(p_svpwm ,clk_pwm ,0 );
 
             init_TIdriver(spi_r);
-            current_t I;
+            current_t I={0};
             unsafe{current_t* unsafe Iptr = &I;
             par{
-                decimate64(c_Idata[0] , DS.DATA_A);
-                decimate64(c_Idata[1] , DS.DATA_C);
-                FOC(c_Idata , c_QE ,c_FOC , c_FIFO , c_FOC2Sup , I);
+                decimate64(c_Idata[0], c_slowIdata[0] , DS.DATA_A);
+                decimate64(c_Idata[1], c_slowIdata[1] , DS.DATA_C);
+                decimate16(c_slowIdata , c_DEC2Sup ,  I);
+                FOC(c_Idata , c_QE ,c_FOC , c_FIFO2FOC , c_FOC2Sup );
                 SVM( c_FOC , c_svm );
                 svpwm(c_svm , clk_pwm  ,p_svpwm );
-                supervisor_cores(supervisor_data , c_FOC2Sup , p_button , p_fault , spi_r , p_SCL , Iptr);
+                supervisor_cores(supervisor_data , c_FOC2Sup , c_DEC2Sup , p_button , p_fault , spi_r , p_SCL , Iptr);
 
                 }
             }

@@ -8,12 +8,14 @@
 #define SVM_H_
 
 #include <xs1.h>
+#define DECIMATE 64
+#define MAXAMP 32
 #define SIN_TBL_BITS 10
 #define SIN_TBL_LEN (1<<SIN_TBL_BITS)
 #define CLKDIV 13
-#define Tp (64*2*CLKDIV)
+#define Tp (DECIMATE*2*CLKDIV)
 #define WRAP (SIN_TBL_LEN*6)
-#define DECIMATE 128
+
 
 void SVM(streaming chanend c_in , streaming chanend c_out);
 void svpwm(streaming chanend c , clock clk , out port p_svm);

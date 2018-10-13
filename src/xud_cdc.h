@@ -24,6 +24,8 @@
 #define CDC_DATA_RX_EP_NUM2          2
 #define CDC_DATA_TX_EP_NUM2          4
 
+#define HEADER_SIZE 4
+
 interface GUI_supervisor_interface{
     [[notification]] slave void data_waiting( void );
     [[clears_notification]] [[guarded]] int getInfo(void);
@@ -31,8 +33,9 @@ interface GUI_supervisor_interface{
     [[guarded]] short readGateDriver(char reg);
     [[guarded]] int writeGateDriver(char reg , short data);
     [[guarded]] int resetGateDriver();
-    [[guarded]] unsigned readCurrent(int reset);
+    [[guarded]] {unsigned , unsigned} readCurrent();
     [[guarded]] void setMaxCurrent(unsigned current);
+    [[guarded]] void resetFuse(void);
 };
 
 interface usb_cdc_interface {
@@ -43,7 +46,9 @@ interface usb_cdc_interface {
 
     [[guarded]] int write(unsigned char data[], REFERENCE_PARAM(unsigned, length));
 
-    [[clears_notification]] [[guarded]] int read(unsigned char data[], REFERENCE_PARAM(unsigned, count));
+    [[guarded]] int read(unsigned char data[], REFERENCE_PARAM(unsigned, count));
+
+    [[clears_notification]] void data_empty();
 
     [[notification]] slave void data_ready( void );
 
@@ -61,5 +66,13 @@ void CdcEndpointsHandler(chanend c_epint_in, chanend c_epbulk_out, chanend c_epb
 
 [[combinable]] void GUIhandler(client interface usb_cdc_interface cdc , client interface GUI_supervisor_interface supervisor);
 [[combinable]] void GCODEhandler(client interface usb_cdc_interface cdc);
+
+enum floatingpoint_scaletype{Current ,Energy};
+unsigned Amp2FixPoint(float I , enum floatingpoint_scaletype scale_i);
+
+float FixPoint2Amp(unsigned I , enum floatingpoint_scaletype scale_i);
+
+float FixPoint2Temp(unsigned t);
+
 
 #endif /* XUD_CDC_H_ */
