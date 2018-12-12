@@ -86,7 +86,7 @@ void decimate64(streaming chanend c , in buffered port:32 p){
             acc += h_lo[i-2][ *(bit_ptr+2)];
             acc += h_lo[i-3][ *(bit_ptr+3)];
          }
-        c <: acc;
+        c <: acc- (1<<20);
         //c[1] <: acc;
     }
 }

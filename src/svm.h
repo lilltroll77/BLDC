@@ -15,7 +15,7 @@
 #define WRAP (SIN_TBL_LEN*6)
 #define DECIMATE 128
 
-void SVM(streaming chanend c_in , streaming chanend c_out);
+unsafe void SVM(streaming chanend c_in , streaming chanend c_out);
 void svpwm(streaming chanend c , clock clk , out port p_svm);
 
 #endif /* SVM_H_ */

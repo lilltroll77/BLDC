@@ -151,9 +151,8 @@ short convert_and_read_scratch(client one_wire_if i_one_wire, unsigned char data
 }
 
 
-unsafe void supervisor(server interface GUI_supervisor_interface supervisor_data , client interface one_wire_if termometer_data , streaming chanend c_FOC , in port p_button , in port p_fault , SPI_t &spi_r ,  current_t * unsafe I ){
+void supervisor(server interface GUI_supervisor_interface supervisor_data , client interface one_wire_if termometer_data , in port p_button , in port p_fault , SPI_t &spi_r){
     set_core_high_priority_off();
-    I->fuse = 0xFFFFFFFF;
 
     int button;
     unsigned char data[9] = {0};
@@ -167,13 +166,7 @@ unsafe void supervisor(server interface GUI_supervisor_interface supervisor_data
     while(1){
         char ct;
         select{
-        case sinct_byref(c_FOC, ct):
-        spi_r.CTRL <: 2;
-        info |= OVER_CURRENT;
-        supervisor_data.data_waiting();
-        printstr("OVERCURRENT");
-        break;
-        case p_button when pinsneq(button):>button:
+         case p_button when pinsneq(button):>button:
             if((button&1)==0 ){
                 spi_r.CTRL <:2;
                 printstr("SHUTDOWN");
@@ -204,15 +197,7 @@ unsafe void supervisor(server interface GUI_supervisor_interface supervisor_data
                     info |=TEMP_CHANGED;
                 }
                 break;
-        case supervisor_data.setMaxCurrent(unsigned current):
-            I->max = current;
-            break;
-        case supervisor_data.readCurrent(int reset) -> unsigned current:
-                if(reset)
-                    I->overcurrent=0;
-                current = I->max;
-                break;
-        case supervisor_data.readTemperature(char ID) -> short temperature:
+         case supervisor_data.readTemperature(char ID) -> short temperature:
                 info &=!TEMP_CHANGED;
                 temperature = temp;
                 break;
@@ -237,10 +222,10 @@ unsafe void supervisor(server interface GUI_supervisor_interface supervisor_data
 
 
 
-unsafe void supervisor_cores(server interface GUI_supervisor_interface supervisor_data , streaming chanend c_FOC , in port p_button , in port p_fault , SPI_t &spi_r , port p_temp ,  current_t * unsafe I){
+void supervisor_cores(server interface GUI_supervisor_interface supervisor_data , in port p_button , in port p_fault , SPI_t &spi_r , port p_temp){
     interface one_wire_if termometer_data;
     par{
            one_wire(termometer_data, p_temp);
-           supervisor(supervisor_data , termometer_data, c_FOC , p_button ,p_fault , spi_r , I);
+           supervisor(supervisor_data , termometer_data, p_button ,p_fault , spi_r);
        }
 }

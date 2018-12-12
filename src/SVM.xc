@@ -11,8 +11,9 @@
 #include "math.h"
 #include "print.h"
 #include "typedefs.h"
+#include "gui_server.h"
 
-void SVM(streaming chanend c_in , streaming chanend c_out ){
+unsafe void SVM(streaming chanend c_in , streaming chanend c_out ){
     int sin_tb[SIN_TBL_LEN+2];
     svm_t svm[2]={0};
 
@@ -66,19 +67,26 @@ void SVM(streaming chanend c_in , streaming chanend c_out ){
     svm[0].p2 = lut[next_sector];
     svm[1].p2 = lut[next_sector];
 */
-
-    c_in :>int _;
+    struct hispeed_t* unsafe mem[2];
+    c_in <:0; // Syncronise
+    c_in :> mem[0];
+    c_in :> mem[1];
     unsigned counter=0;
 #pragma unsafe arrays
     while(1){
         counter++;
-        if((counter & 0xF)==0)
-            angle++;
+      //  if((counter & 0xF)==0)
 
+        angle++;
         if(angle<0)
             angle += (6*SIN_TBL_LEN);
         else if(angle>= (6*SIN_TBL_LEN) )
             angle -= 6*SIN_TBL_LEN;
+        //c_in :> mem;
+        mem[buffer]->angle = angle;
+        if((amp<0x6000) && buffer)//0x7000
+            amp++;
+        mem[buffer]->U = amp;
 
         int sector = angle>>SIN_TBL_BITS;
 
@@ -90,8 +98,7 @@ void SVM(streaming chanend c_in , streaming chanend c_out ){
         int fi1 = (next_sector<<SIN_TBL_BITS) - angle;
 
 
-        if((amp<0x7000) && buffer)//0x7000
-            amp++;
+
         { t1, e1} = macs( amp , sin_tb[fi1] , t1 , e1);
         if(t1<(limit/2) )
             svm[buffer].t1=0;

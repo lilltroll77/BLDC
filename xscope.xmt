@@ -1,13 +1,19 @@
 <XtEvents>
 <XtEventTypes>
-<XtEventType Id="0" Type="3" Name="ANGLE" Units="ps" UserType="2" UserUnits="steps"/>
+<XtEventType Id="0" Type="3" Name="PROBE_ANGLE" Units="ps" UserType="2" UserUnits="steps"/>
+<XtEventType Id="1" Type="2" Name="I_D" Units="ps" UserType="2" UserUnits="CLK"/>
+<XtEventType Id="2" Type="2" Name="I_Q" Units="ps" UserType="2" UserUnits="CLK"/>
+<XtEventType Id="3" Type="3" Name="GUI" Units="ps" UserType="2" UserUnits="CLK"/>
 <XtEventType Id="255" Type="1" Name="Missing Data" Units="ps" UserType="0" UserUnits="None"/>
 </XtEventTypes>
 <XtEventColors>
 <XtEventColor Id="0" R="148" G="0" B="211" KeyText="None"/>
+<XtEventColor Id="1" R="255" G="69" B="0" KeyText="None"/>
+<XtEventColor Id="2" R="218" G="165" B="32" KeyText="None"/>
+<XtEventColor Id="3" R="0" G="139" B="139" KeyText="None"/>
 <XtEventColor Id="255" R="255" G="0" B="0" KeyText="None"/>
 </XtEventColors>
-<XtGlobalStart MilliSecs="1537638094100"/>
+<XtGlobalStart MilliSecs="1544424120828"/>
 <TotalXtEvents Number="0"/>
 <XtEventRecords>
 </XtEventRecords>
