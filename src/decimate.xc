@@ -22,7 +22,7 @@ const int h[FIRLEN]={1, 3, 6, 10, 15, 21, 28, 36, 45, 55, 66, 78, 91, 105, 120, 
 
 
 #pragma unsafe arrays
-void decimate64(streaming chanend c , in buffered port:32 p){
+void decimate64(streaming chanend c , in buffered port:32 p , int offset){
     int write=0;
     int read=1;
     int h_hi[BLOCKS/2][SIZE];
@@ -86,7 +86,7 @@ void decimate64(streaming chanend c , in buffered port:32 p){
             acc += h_lo[i-2][ *(bit_ptr+2)];
             acc += h_lo[i-3][ *(bit_ptr+3)];
          }
-        c <: acc- (1<<20);
+        c <: acc - offset;
         //c[1] <: acc;
     }
 }

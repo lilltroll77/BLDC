@@ -7,7 +7,8 @@
 
 #ifndef FOC_H_
 #define FOC_H_
-
+#include "typedefs.h"
+#define CALIBRATE_QE 0
 
 
 struct state_t{

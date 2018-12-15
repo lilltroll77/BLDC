@@ -9,9 +9,10 @@
 #include "svm.h"
 #include <xscope.h>
 #include "math.h"
-#include "print.h"
+#include "stdio.h"
 #include "typedefs.h"
 #include "gui_server.h"
+#include "foc.h"
 
 unsafe void SVM(streaming chanend c_in , streaming chanend c_out ){
     int sin_tb[SIN_TBL_LEN+2];
@@ -19,7 +20,7 @@ unsafe void SVM(streaming chanend c_in , streaming chanend c_out ){
 
     int angle=0;
     unsigned e1=0,e2=0;
-    int amp=0;
+    int amp=0x7FFF;
     int buffer=0;
 
     //Switching vector
@@ -75,18 +76,30 @@ unsafe void SVM(streaming chanend c_in , streaming chanend c_out ){
 #pragma unsafe arrays
     while(1){
         counter++;
-      //  if((counter & 0xF)==0)
+#if(CALIBRATE_QE==1)
+        select{
+            case c_in :> int df:
+                angle +=df;
+                c_in <: angle;
+                break;
+            default:
+                amp=0x6500;
+                buffer=0;
+                break;
+        }
+#else
+     c_in :> angle;
+     c_in :> amp;
+#endif
 
-        angle++;
         if(angle<0)
             angle += (6*SIN_TBL_LEN);
         else if(angle>= (6*SIN_TBL_LEN) )
             angle -= 6*SIN_TBL_LEN;
         //c_in :> mem;
         mem[buffer]->angle = angle;
-        if((amp<0x6000) && buffer)//0x7000
-            amp++;
         mem[buffer]->U = amp;
+
 
         int sector = angle>>SIN_TBL_BITS;
 

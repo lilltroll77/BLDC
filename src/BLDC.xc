@@ -20,9 +20,11 @@
 
 
 extern void QE(streaming chanend c_out , in port pA , in port pB , in port pX , unsigned QEangle[1]);
-extern void decimate64(streaming chanend c , in buffered port:32 p);
+extern void decimate64(streaming chanend c , in buffered port:32 p , int offset);
 extern void wait(unsigned clk);
 
+#define ADC_OFFSET_A ((1<<20)-700)
+#define ADC_OFFSET_C ((1<<20)-1700)
 
 int main(){
     streaming chan c_Idata[2], c_QE, c_FOC,c_svm;
@@ -64,8 +66,8 @@ int main(){
             init_TIdriver(spi_r);
             unsafe{
                 par{
-                decimate64(c_Idata[0] , DS.DATA_A);
-                decimate64(c_Idata[1] , DS.DATA_C);
+                decimate64(c_Idata[0] , DS.DATA_A , ADC_OFFSET_A);
+                decimate64(c_Idata[1] , DS.DATA_C , ADC_OFFSET_C);
                 FOC(c_Idata , c_QE ,c_FOC , sc_FOC2GUI , sc_FOC2CDC);
                 SVM( c_FOC , c_svm );
                 svpwm(c_svm , clk_pwm  ,p_svpwm );

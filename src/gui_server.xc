@@ -26,10 +26,12 @@ unsafe void gui_server(streaming chanend c_from_RX , streaming chanend c_from_ds
     unsigned time;
     tmr:>time;
     unsigned sample=0;
+    c_from_dsp :> fast;
     while(1){
         select{
         case tmr when timerafter(time + 2E6) :> time:
-        if(CPUload>0)
+               // printf("A:%d C: %d \n" , fast->IA , fast->IC);
+                if(CPUload>0)
             CPUload--;
         break;
         case c_from_dsp :> fast:
@@ -37,8 +39,9 @@ unsafe void gui_server(streaming chanend c_from_RX , streaming chanend c_from_ds
 /*1*/   c_from_RX <: sample;
         sample = (sample+1)& (FFT_LEN-1);
         c_from_RX <: fast->IA;
-        //printf("%d\n" , fast->IA);
         c_from_RX <: fast->IC;
+
+
         //c_from_RX <: fast->QE;
         c_from_RX <: fast->Torque;
 /*6*/   c_from_RX <: fast->Flux;

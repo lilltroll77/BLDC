@@ -26,6 +26,18 @@ void writeCPUloadNow(int x , struct hispeed_t* unsafe mem){
     asm("stw %0 , %1[%2]" :: "r"(x), "r"(mem) , "r"(7));
 }
 
+static inline
+int PI(int x, int p , int i , int &hi , unsigned &lo){
+    //antiwindup ??
+    int h; unsigned l;
+    {h , l}  = macs( x , p , 0 , 0 );
+    asm("lextract %0,%1,%2,%3,32": "=r"(h):"r"(h),"r"(l) ,"r"(22));
+
+    {hi , lo} = macs( h , i , hi , lo);
+    //asm("ladd %0,%1,%2,%3,%4" : "=r"(h), "=r"(l) :  "r"(hi), "r"(lo) , "r"(0));
+    return h+hi;
+}
+
 unsafe void FOC(streaming chanend c_I[2] , streaming chanend c_fi , streaming chanend c_out , streaming chanend c_gui_server , streaming chanend c_from_CDC){
     struct sharedMem_t shared_mem;
     struct hispeed_t* unsafe mem;
@@ -57,10 +69,59 @@ unsafe void FOC(streaming chanend c_I[2] , streaming chanend c_fi , streaming ch
     int ctrl=0;
     tmr1 :> t[0];
     tmr1 :> t[1];
+
+#if(CALIBRATE_QE)
+    int fi=-1 , angle;
+    //Find trigger
+    while(fi<0){
+        tmr1 when timerafter(t[0] + 2e4):> t[0];
+        c_out<: 1;
+        soutct( c_fi ,1 );
+        c_fi :> fi;
+        c_out:> angle;
+    }
+    for(int i=0; i<2048 ;i++){
+        tmr1 when timerafter(t[0] + 1e4):> t[0];
+        c_out<: 1;
+        c_out:> angle;
+    }
+    soutct( c_fi ,1 );
+    c_fi :> fi;
+    if(fi>4096)
+        printf("Motor spins in wrong direction\n");
+    else{
+
     while(1){
+        int mean=0;
+        for(int i=0; i<(1<<14) ; i++){
+            tmr1 when timerafter(t[0] + 1e4):> t[0];
+            soutct( c_fi ,1 );
+            if(angle > (3*SIN_TBL_LEN))
+                c_out<: 1;
+            else if(angle > 0)
+                c_out<: -1;
+            else
+                c_out<: 0;
+            c_fi :> fi;
+            mean += fi;
+            c_out :> angle;
+        }
+        printf("QE Offset = %d\n" , mean>>14);
+
+    }
+
+    }
+}
+
+ #else
+    mem = &shared_mem.dsp[block].fast;
+    c_gui_server <:mem;
+    unsigned counter=0;
+        while(1){
         select{
         default:
-            c_fi <: 0;
+
+            soutct( c_fi ,1 );
             mem = &shared_mem.dsp[block].fast;
             block = !block;
              //c_out <: mem;
@@ -69,12 +130,51 @@ unsafe void FOC(streaming chanend c_I[2] , streaming chanend c_fi , streaming ch
             c_I[0]:> mem->IA;
             c_I[1]:> mem->IC;
             tmr1 :> t[1];
-
-
+            int fi;
+            c_fi:> fi;
+            if(fi <0){ // Has not triggered, try and rotate blind
+                counter++;
+                fi = (counter>>4) %(6*1024);
+                c_out <: fi;
+                c_out <: 0x6000;
+            }
+            else{
+                //Scale from QE angle to Space vector angle
+                fi %=1170; //8192 / 7 magnets
+                fi *=42; // 6 sectors * 7 magnets
+                fi >>=3; //8192 / 1024
+                fi += 1536; //Add 90 deg of Space vector 1024*90deg/60deg
+                c_out <: fi;
+                c_out <: 0x7FFF;
+            }
+            //(B – C)*(1/sqrt(3) = -(A+C)-C /sqrt(3) = (-2*A - 4C)*0.288675134594813
+ /*           int Beta;
+            unsigned _lo;
+            {Beta , _lo} = macs(-2*mem->IA - 4*mem->IC, 1239850262 , 0 , 0x80000000);
             int cos_fi , sin_fi;
             c_fi:> sin_fi;
             c_fi:> cos_fi;
 
+            int Id , Iq;
+            unsigned Id_lo , Iq_lo;
+
+            {Id , Id_lo} = macs(mem->IA , cos_fi , 0 , 0x80000000);
+            {Id , Id_lo} = macs(Beta    , sin_fi , Id , Id_lo);
+
+            Id = PI( 5000 - Id , reg[0].P , reg[0].I , Int[0].hi , Int[0].lo);
+
+
+            {Iq , Iq_lo} = macs(Beta    , cos_fi , 0 , 0x80000000);
+            {Iq , Iq_lo} = macs(mem->IA ,-sin_fi , Iq , Iq_lo);
+
+            Iq = PI( - Iq , reg[1].P , reg[1].I , Int[1].hi , Int[1].lo);
+
+            int alfa;
+            unsigned alfa_lo;
+            {alfa , alfa_lo} = macs(Id ,  cos_fi , 0 , 0x80000000);
+            {alfa , alfa_lo} = macs(Iq , -sin_fi  ,  alfa , alfa_lo);
+            //sqrt(alfa);
+*/
             /* DSP END */
             if(ctrl)
                 c_gui_server <: mem;
@@ -152,12 +252,13 @@ unsafe void FOC(streaming chanend c_I[2] , streaming chanend c_fi , streaming ch
             }
             break;
         }
-
-
-
-
     }
 }
+
+
+#endif
+
+
 
 
 
