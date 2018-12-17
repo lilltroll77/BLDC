@@ -4,10 +4,12 @@
  *  Created on: 10 dec 2018
  *      Author: micke
  */
-#include "xud.h"
 #ifndef CDC_HANDLERS_H_
 #define CDC_HANDLERS_H_
 
+
+#include "xud.h"
+#include "supervisor.h"
 
 #define FIFO1_LEN 1024
 #define FIFO2_LEN 64
@@ -81,11 +83,12 @@ struct regulator_t{
 };
 
 enum INstatus_e{InEPready=-2 , BufferWritten=-1 , BufferReadyToWrite=0};
-enum message_e{streamOUT, PIsection , EQsection , resetPI , resetEQsec , resetEQ , FuseCurrent , FuseStatus , SignalSource , SignalGenerator};
+enum message_e{streamOUT, PIsection , EQsection , resetPI , resetEQsec , resetEQ , FuseCurrent , FuseStatus , SignalSource , SignalGenerator,
+               DRV_VDS , DRV_ODT , DRV_TDRIVE , DRV_IDRIVE_P_HS , DRV_IDRIVE_N_HS , DRV_IDRIVE_P_LS , DRV_IDRIVE_N_LS};
 enum signal_e{OFF , MLS18 , RND , SINE , OCTAVE};
 
 
-unsafe void cdc_handler1(client interface cdc_if cdc , streaming chanend c_from_dsp , streaming chanend c_from_RX , chanend c_ep_in[], XUD_buffers_t * unsafe buff);
+unsafe void cdc_handler1(client interface cdc_if cdc ,  client interface GUI_supervisor_interface supervisor  , streaming chanend c_from_dsp , streaming chanend c_from_RX , chanend c_ep_in[], XUD_buffers_t * unsafe buff);
 
 
 #endif /* CDC_HANDLERS_H_ */

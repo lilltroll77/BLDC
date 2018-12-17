@@ -37,7 +37,7 @@ int main(){
           unsafe{
           unsigned* unsafe angle = QEangle;
           par{
-              usb_server( sc_FOC2CDC , sc_GUI2RX , angle );
+              usb_server( sc_FOC2CDC , sc_GUI2RX , angle , supervisor_data);
               QE(c_QE , QE_r.A , QE_r.B , QE_r.X , QEangle);
           }}
       }

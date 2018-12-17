@@ -13,6 +13,12 @@
 
 enum message{SHUTDOWN=1 , DRV_ERROR=2 , TEMP_CHANGED=4 , OVER_CURRENT=8};
 
+#define HISIDE_REG 3
+#define LOSIDE_REG 4
+#define TDRIVE_REG 4
+#define ODT_REG 5
+#define VDS_REG 5
+
 interface GUI_supervisor_interface{
     [[notification]] slave void data_waiting( void );
     [[clears_notification]] [[guarded]] int getInfo(void);

@@ -15,7 +15,7 @@
 #define DEBUG 0
 
 //cdc data is queued on a FIFO
-unsafe void cdc_handler1(client interface cdc_if cdc , streaming chanend c_from_FOC , streaming chanend c_from_RX, chanend c_ep_in[],XUD_buffers_t * unsafe buff){
+unsafe void cdc_handler1(client interface cdc_if cdc , client interface GUI_supervisor_interface supervisor  , streaming chanend c_from_FOC , streaming chanend c_from_RX, chanend c_ep_in[],XUD_buffers_t * unsafe buff){
     set_core_high_priority_off();
     XUD_Result_t result;
     int buffer_writing2host=InEPready;
@@ -170,6 +170,69 @@ unsafe void cdc_handler1(client interface cdc_if cdc , streaming chanend c_from_
                      //printint(buff->rx.read1[0]);
                      //c_fromSigGen <: buff->rx.read1[0];
                      buff->rx.read1++;
+                     break;
+                 case DRV_VDS:
+                     int data_val = *buff->rx.read1++;
+                     short reg_data=supervisor.readGateDriver(VDS_REG);
+                     reg_data &=0xFF0;
+                     reg_data |=data_val;
+                     supervisor.writeGateDriver(VDS_REG , reg_data);
+                     printstr("COM VDS: ");
+                     printhex(data_val);printchar(',');printhexln(reg_data);
+                     break;
+                 case DRV_ODT:
+                     int data_val = *buff->rx.read1++;
+                     short reg_data=supervisor.readGateDriver(ODT_REG);
+                     reg_data &=0x4FF;
+                     reg_data |=data_val<<8;
+                     supervisor.writeGateDriver(ODT_REG , reg_data);
+                     printstr("COM ODT:");
+                     printhex(data_val);printchar(',');printhexln(reg_data);
+                     break;
+                 case DRV_TDRIVE:
+                     int data_val = *buff->rx.read1++;
+                     short reg_data=supervisor.readGateDriver(TDRIVE_REG);
+                     reg_data &=0x4FF;
+                     reg_data |=data_val<<8;
+                     supervisor.writeGateDriver(TDRIVE_REG , reg_data);
+                     printstr("COM TDRIVE:");
+                     printhex(data_val);printchar(',');printhexln(reg_data);
+                     break;
+                 case DRV_IDRIVE_P_HS:
+                     int data_val = *buff->rx.read1++;
+                     short reg_data=supervisor.readGateDriver(HISIDE_REG);
+                     reg_data &=0xF0F;
+                     reg_data |=data_val<<4;
+                     supervisor.writeGateDriver(HISIDE_REG , reg_data);
+                     printstr("COM IDRIVE: P-HS ");
+                     printhex(data_val);printchar(',');printhexln(reg_data);;
+                     break;
+                 case DRV_IDRIVE_N_HS:
+                     int data_val = *buff->rx.read1++;
+                     short reg_data=supervisor.readGateDriver(HISIDE_REG);
+                     reg_data &=0xFF0;
+                     reg_data |=data_val;
+                     supervisor.writeGateDriver(HISIDE_REG , reg_data);
+                     printstr("COM IDRIVE: N-HS ");
+                     printhex(data_val);printchar(',');printhexln(reg_data);
+                     break;
+                 case DRV_IDRIVE_P_LS:
+                     int data_val = *buff->rx.read1++;
+                     short reg_data=supervisor.readGateDriver(LOSIDE_REG);
+                     reg_data &=0xF0F;
+                     reg_data |=data_val<<4;
+                     supervisor.writeGateDriver(LOSIDE_REG, reg_data);
+                     printstr("COM IDRIVE: P-LS ");
+                     printhex(data_val);printchar(',');printhexln(reg_data);
+                     break;
+                 case DRV_IDRIVE_N_LS:
+                     int data_val = *buff->rx.read1++;
+                     short reg_data=supervisor.readGateDriver(LOSIDE_REG);
+                     reg_data &=0xFF0;
+                     reg_data |=data_val;
+                     supervisor.writeGateDriver(LOSIDE_REG , reg_data);
+                     printstr("COM IDRIVE: N-LS ");
+                     printhex(data_val);printchar(',');printhexln(reg_data);
                      break;
                 default:
                     printf("Unknown command %d %d %d\n" , buff->rx.read1[0] , buff->rx.read1[1],buff->rx.read1[2]);

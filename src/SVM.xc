@@ -20,7 +20,7 @@ unsafe void SVM(streaming chanend c_in , streaming chanend c_out ){
 
     int angle=0;
     unsigned e1=0,e2=0;
-    int amp=0x7FFF;
+    int amp=0xFFFF;
     int buffer=0;
 
     //Switching vector

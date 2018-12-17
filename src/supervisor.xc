@@ -206,6 +206,10 @@ void supervisor(server interface GUI_supervisor_interface supervisor_data , clie
                 data_reg=ReadFromDRV8320S(reg , spi_r);
                 break;
         case supervisor_data.writeGateDriver(char reg , short val) -> int ack:
+                WriteToDRV8320S( reg , val , spi_r); // OCP PWM3
+                int readback = ReadFromDRV8320S(reg , spi_r);
+                if(readback != val)
+                    printstrln("Error in SPI com. to TI gatedriver");
                 ack=1;
                 break;
         case supervisor_data.getInfo() -> int new_info:
