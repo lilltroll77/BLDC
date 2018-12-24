@@ -14,6 +14,8 @@
 #include "gui_server.h"
 #include "foc.h"
 
+#define request_FOCdata soutct(c_in ,0)
+
 unsafe void SVM(streaming chanend c_in , streaming chanend c_out ){
     int sin_tb[SIN_TBL_LEN+2];
     svm_t svm[2]={0};
@@ -69,9 +71,9 @@ unsafe void SVM(streaming chanend c_in , streaming chanend c_out ){
     svm[1].p2 = lut[next_sector];
 */
     struct hispeed_t* unsafe mem[2];
-    c_in <:0; // Syncronise
     c_in :> mem[0];
     c_in :> mem[1];
+    request_FOCdata;
     unsigned counter=0;
 #pragma unsafe arrays
     while(1){
@@ -90,6 +92,7 @@ unsafe void SVM(streaming chanend c_in , streaming chanend c_out ){
 #else
      c_in :> angle;
      c_in :> amp;
+     request_FOCdata;
 #endif
 
         if(angle<0)
@@ -99,6 +102,15 @@ unsafe void SVM(streaming chanend c_in , streaming chanend c_out ){
         //c_in :> mem;
         mem[buffer]->angle = angle;
         mem[buffer]->U = amp;
+
+        if(amp==0){
+            //ADC will loose supply voltage if output is free floating
+            svm[buffer].p1 = lut[7];
+            svm[buffer].p2 = lut[7];
+            svm[buffer].t1=100;
+            svm[buffer].t2=100;
+        }
+        else{
 
 
         int sector = angle>>SIN_TBL_BITS;
@@ -134,7 +146,7 @@ unsafe void SVM(streaming chanend c_in , streaming chanend c_out ){
             svm[buffer].t2=t2;
             t2=0;
         }
-
+        }
         svm[buffer].t0 = Tp - svm[buffer].t1 - svm[buffer].t2;
         svm[buffer].t_before = svm[buffer].t0>>1;
         svm[buffer].t_after = svm[buffer].t0 - svm[buffer].t_before;

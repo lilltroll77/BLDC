@@ -22,7 +22,7 @@ unsafe void resetPointers(XUD_buffers_t &buffer){
 }
 
 
-unsafe void usb_server(streaming chanend c_FOC2CDC , streaming chanend sc_GUI2RX , int* unsafe angle , client interface GUI_supervisor_interface supervisor_data ){
+unsafe void usb_server(streaming chanend c_FOC2CDC , streaming chanend sc_GUI2RX , struct QE_t* unsafe QEptr , client interface GUI_supervisor_interface supervisor_data ){
     chan c_ep_out[XUD_EP_COUNT_OUT], c_ep_in[XUD_EP_COUNT_IN];
     streaming chan sc_CDC2RX;
     interface cdc_if cdc[1];
@@ -81,7 +81,7 @@ unsafe void usb_server(streaming chanend c_FOC2CDC , streaming chanend sc_GUI2RX
                 par{
                     Endpoints(cdc , c_ep_out ,  buffer);
                     cdc_handler1(cdc[0] , supervisor_data  , c_FOC2CDC , sc_CDC2RX, c_ep_in , buffer_ptr);
-                    RX_block(sc_GUI2RX , sc_CDC2RX , angle );
+                    RX_block(sc_GUI2RX , sc_CDC2RX , QEptr );
                 }
 
             }//guards

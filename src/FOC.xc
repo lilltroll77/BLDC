@@ -16,14 +16,94 @@
 #include "gui_server.h"
 #include "cdc_handlers.h"
 #include "FOC.h"
+#include "RX_block.h"
 
 #define DEBUG 0
 
+
+
+unsafe void gui_server(streaming chanend c_from_RX , streaming chanend c_from_dsp){
+    set_core_high_priority_off();
+    struct sharedMem_t* unsafe shared_mem;
+    unsigned CPUload=0;
+    struct hispeed_t* unsafe fast;
+    #pragma unsafe arrays
+
+    c_from_dsp :> shared_mem;
+    int fuse_current= 32<<14; //32 [A] default
+    char fuse_state=1;
+
+    timer tmr;
+    unsigned time;
+    tmr:>time;
+    unsigned sample=0;
+    soutct(c_from_RX , CT_VERIFY); //Verification of correct channel connection
+
+    while(1){
+        int fuse_data;
+        select{
+            case c_from_RX :> fuse_data:
+                if(fuse_data == fuse_REPLACE){
+                    fuse_state = fuse_GOOD;
+                    soutct(c_from_dsp , fuse_state);
+                }
+                else{
+                    fuse_current = fuse_data;
+                    //printintln(fuse_current);
+                }
+
+            break;
+        case tmr when timerafter(time + 1e7) :> time:
+            //printint(CPUload);
+              if(CPUload>0)
+                CPUload--;
+        break;
+        case c_from_dsp :> fast:
+            int absIA = abs(fast->IA);
+            int absIB = abs(fast->IA + fast->IC);
+            int absIC = abs(fast->IC);
+            if(absIA < absIB)
+                absIA = absIB;
+            if(absIA < absIC)
+                absIA = absIC;
+            unsigned newLoad = shared_mem->CPUload & 2047;
+            if( newLoad > CPUload)
+                    CPUload = newLoad;
+         // send to other tile
+/*1*/   c_from_RX <: sample; sample = (sample+1)& (FFT_LEN-1);
+/*2*/   c_from_RX <: fast->IA;
+        c_from_RX <: fast->IC;
+/*4*/   c_from_RX <: fast->Torque;
+        c_from_RX <: fast->Flux;
+/*6*/   c_from_RX <: fast->U;
+        c_from_RX <: fast->angle;
+/*8*/   c_from_RX <: CPUload;
+        if((absIA > fuse_current) && (fuse_state!=fuse_BLOWNED)){
+            // Fuse blown
+            fuse_state=fuse_BLOWNED;
+            //Signal DSP & RX
+            soutct(c_from_RX ,  fuse_BLOWNED);
+            soutct(c_from_dsp , fuse_BLOWNED);
+
+        }
+        else
+            soutct(c_from_RX , fuse_NOCHANGE);
+       break;
+
+        }
+    }
+}
+
+
+
 static inline
-void writeCPUloadNow(int x , struct hispeed_t* unsafe mem){
+void writeCPUloadNow(unsigned &t_old , timer tmr , unsigned* mem){
     //struct hispeed_t* offset=0;
     //const unsigned* pos = &offset->CPUload;
-    asm("stw %0 , %1[%2]" :: "r"(x), "r"(mem) , "r"(7));
+    unsigned t_new;
+    tmr :> t_new;
+    asm("stw %0 , %1[%2]" :: "r"(t_new-t_old), "r"(mem) , "r"(0));
+    tmr :> t_old;
 }
 
 static inline
@@ -38,11 +118,11 @@ int PI(int x, int p , int i , int &hi , unsigned &lo){
     return h+hi;
 }
 
+
 unsafe void FOC(streaming chanend c_I[2] , streaming chanend c_fi , streaming chanend c_out , streaming chanend c_gui_server , streaming chanend c_from_CDC){
     struct sharedMem_t shared_mem;
-    struct hispeed_t* unsafe mem;
-    struct fuse_t* unsafe fuse = &shared_mem.fuse;
-    struct state_t state[4];
+    struct hispeed_t* unsafe mem = &shared_mem.dsp[0].fast;
+     struct state_t state[4];
     struct data64_t Int[2];
     struct regulator_t reg[2];
     memset( &shared_mem , 0 , sizeof(shared_mem));
@@ -58,17 +138,14 @@ unsafe void FOC(streaming chanend c_I[2] , streaming chanend c_fi , streaming ch
     c_from_CDC <:(int* unsafe) reg;
     c_from_CDC <:(int* unsafe) state;
 
-    c_gui_server <: fuse;
-    c_out :> int _; //Syncronise
     c_out <:(struct hispeed_t* unsafe) &shared_mem.dsp[0].fast;
     c_out <:(struct hispeed_t* unsafe) &shared_mem.dsp[1].fast;
 
     timer tmr1;
-    unsigned t[2];
+    unsigned told;
     int block=0;
     int ctrl=0;
-    tmr1 :> t[0];
-    tmr1 :> t[1];
+    //printint(t[1]-t[0]);
 
 #if(CALIBRATE_QE)
     int fi=-1 , angle;
@@ -76,7 +153,7 @@ unsafe void FOC(streaming chanend c_I[2] , streaming chanend c_fi , streaming ch
     while(fi<0){
         tmr1 when timerafter(t[0] + 2e4):> t[0];
         c_out<: 1;
-        soutct( c_fi ,1 );
+        soutct( c_fi , CT );
         c_fi :> fi;
         c_out:> angle;
     }
@@ -85,7 +162,7 @@ unsafe void FOC(streaming chanend c_I[2] , streaming chanend c_fi , streaming ch
         c_out<: 1;
         c_out:> angle;
     }
-    soutct( c_fi ,1 );
+    soutct( c_fi , CT );
     c_fi :> fi;
     if(fi>4096)
         printf("Motor spins in wrong direction\n");
@@ -95,7 +172,7 @@ unsafe void FOC(streaming chanend c_I[2] , streaming chanend c_fi , streaming ch
         int mean=0;
         for(int i=0; i<(1<<14) ; i++){
             tmr1 when timerafter(t[0] + 1e4):> t[0];
-            soutct( c_fi ,1 );
+            soutct( c_fi , CT );
             if(angle > (3*SIN_TBL_LEN))
                 c_out<: 1;
             else if(angle > 0)
@@ -114,39 +191,131 @@ unsafe void FOC(streaming chanend c_I[2] , streaming chanend c_fi , streaming ch
 }
 
  #else
-    mem = &shared_mem.dsp[block].fast;
-    c_gui_server <:mem;
-    unsigned counter=0;
+    unsigned counter=1;
+    int fi;
+    int Vout = 0x2000;
+    int FOCangle=0;
+
+    const int iMax_init=3*AMPERE;
+    if(iMax_init > 25*(1<<15)){
+        printf("Incorrect current settings\n Limit will clip in ADC\nABORTING!\n");
+        while(1);
+    }
+
+    soutct(c_I[0] , 0); //start adc
+    soutct(c_I[1] , 0); //start adc
+
+
+
+timer tmr;
+unsigned t;
+tmr :> t;
+// Charge ADC rail and wait for ADC stabilization
+int samples=3e4;
+const int Ierror = 1e3; //Maximum error allowed after stab.
+do{
+        char ct;
+        int iA=0x80000000 , iC=0x80000000;
+        select{
+        case sinct_byref(c_out , ct):
+            c_out <: 0;
+            c_out <: 0;
+            if((iA < Ierror) & (iC < Ierror))
+                samples--;
+        break;
+        case c_I[0]:> iA:
+            iA = abs(iA);
+        break;
+        case c_I[1]:> iC:
+            iC = abs(iC);
+        break;
+        case tmr when timerafter(t + 5e8):>t:
+            printf("ADC did not stabalize within 5s!\niA=%d , iC=%d \n !! ABORTING!!", iA , iC);
+            while(1);
+        break;
+        }
+    }while(samples!=0);
+    printstrln("ADC OK");
+    c_out <: 0;
+    c_out <: 0;
+
+    //Force motor to FOCangle=0 position with a DC current
+
+
+
+    int cont=1;
+    do{
+        int i;
+        char ct;
+        select{
+        case sinct_byref(c_out , ct):
+            samples++;
+            c_out <: FOCangle;
+            c_out <: Vout;
+             if((samples&0x7)==0){
+                Vout++;
+                if(Vout==0x7FFF) // Increase voltage until Vmax
+                    cont=0;
+            }
+        break;
+        case c_fi:> fi:
+        break;
+        case c_I[0]:> i:
+            i = abs(i);
+            if((i > iMax_init)){ // Increase voltage until current = Imax
+                cont=0;
+                //printint(i);
+            }
+        break;
+        case c_I[1]:> i:
+            i = abs(i);
+            if((i > iMax_init)){ // Increase voltage until current = Imax
+                cont=0;
+                //printint(i);
+            }
+        break;
+        }
+    }while(cont);
+    //reset QE until real calib is done based on QE trigger
+    c_fi <:0;
+    c_fi :> fi;
+    //Vout = 0x1000;
+    printstrln("OK");
+
+
+    tmr :> t;
+
+    char ct_fuse=fuse_GOOD;
+    char ct;
         while(1){
         select{
-        default:
+            case tmr when timerafter(t + 3e8) :> t:
+                    if(ct_fuse != fuse_GOOD)
+                        break;
+                    if(FOCangle < (3*1024)/2 ) //Rotate vector 90 deg step by step
+                        FOCangle++;
+                    else if(Vout<0x7FFF) //Then increase voltage
+                        Vout++;
+            break;
+            case sinct_byref(c_gui_server , ct_fuse):
+                if(ct_fuse == fuse_BLOWNED){
+                    Vout=0;
+                    FOCangle=0;
+                    printchar('B');
+                }
+                else
+                    printchar('G');
 
-            soutct( c_fi ,1 );
-            mem = &shared_mem.dsp[block].fast;
-            block = !block;
-             //c_out <: mem;
-            tmr1 :> t[0];
-            writeCPUloadNow(t[0] - t[1] ,mem);
-            c_I[0]:> mem->IA;
-            c_I[1]:> mem->IC;
-            tmr1 :> t[1];
-            int fi;
-            c_fi:> fi;
-            if(fi <0){ // Has not triggered, try and rotate blind
-                counter++;
-                fi = (counter>>4) %(6*1024);
-                c_out <: fi;
-                c_out <: 0x6000;
-            }
-            else{
-                //Scale from QE angle to Space vector angle
-                fi %=1170; //8192 / 7 magnets
-                fi *=42; // 6 sectors * 7 magnets
-                fi >>=3; //8192 / 1024
-                fi += 1536; //Add 90 deg of Space vector 1024*90deg/60deg
-                c_out <: fi;
-                c_out <: 0x7FFF;
-            }
+
+            break;
+            case sinct_byref(c_out , ct): // new calc requested
+            //writeCPUloadNow( told , tmr1,  &shared_mem.CPUload);
+            c_out <: fi + FOCangle;
+            c_out <: Vout;
+
+            //c_out <: mem;
+            //Scale from QE angle to Space vector angle
+
             //(B – C)*(1/sqrt(3) = -(A+C)-C /sqrt(3) = (-2*A - 4C)*0.288675134594813
  /*           int Beta;
             unsigned _lo;
@@ -176,9 +345,22 @@ unsafe void FOC(streaming chanend c_I[2] , streaming chanend c_fi , streaming ch
             //sqrt(alfa);
 */
             /* DSP END */
-            if(ctrl)
-                c_gui_server <: mem;
-       break;
+            //writeCPUloadNow( told , tmr1,  &shared_mem.CPUload);
+
+        break;
+        case c_fi:> fi:
+            break;
+/* I should be in sync with U !*/
+        case c_I[0]:> mem->IA:
+             c_I[1]:> mem->IC;
+             if(ctrl)
+               c_gui_server <: mem;
+            counter = !counter;
+            if(counter)
+                mem = &shared_mem.dsp[1].fast;
+            else
+                mem = &shared_mem.dsp[0].fast;
+        break;
         case c_from_CDC :> int cmd:
             //printf("FOC cmd: %d\n" , cmd);
             switch(cmd){
@@ -229,19 +411,6 @@ unsafe void FOC(streaming chanend c_I[2] , streaming chanend c_fi , streaming ch
                 ptr[1]=0; //y2
                 ptr[2]=0; //x1,x2
                 ((int*)ptr)[6]=0; //error
-                break;
-            case FuseCurrent:
-                c_from_CDC :> shared_mem.fuse.current;
-#if(DEBUG==1)
-                printintln(shared_mem.fuse.current);
-#endif
-                break;
-            case FuseStatus:
-                c_from_CDC :>  shared_mem.fuse.state;
-#if(DEBUG==1)
-                printstr("Fuse:");
-                printintln(shared_mem.fuse.state);
-#endif
                 break;
             case SignalSource:
                 c_from_CDC :> int signalsource;

@@ -9,76 +9,84 @@
 #include "math.h"
 #include <print.h>
 #include "FOC.h"
+#include "QE.h"
 
 #define QE_RES 8192
 #define DIRECTION (-1) // Can be 1 or (-1)
 
 //Set this value to 0 during first calibration run
 #define QE_OFFSET 274
+#define UP   (QEdata.angle+DIRECTION)&(QE_RES-1)
+#define DOWN (QEdata.angle-DIRECTION)&(QE_RES-1)
 
-void QE(streaming chanend c , in port pA , in port pB , in port pX , unsigned QEangle[1]){
+#define FOC_SECTORS 6
+
+int translate(int fi){
+    return ((FOC_SECTORS*7)*fi)%(FOC_SECTORS*8192)>>3;
+}
+
+void QE(streaming chanend c , in port pA , in port pB , in port pX , clock clk , struct QE_t &QEdata){
     set_core_high_priority_on();
+    set_clock_div(clk , 25); //Create 2 MHz clock to handle debounce
+    set_port_clock(pX , clk);
+    set_port_clock(pA , clk);
+    set_port_clock(pB , clk);
+    start_clock(clk);
+
     int sin_tb[QE_RES];
     for(int i=0; i<QE_RES ; i++)
         sin_tb[i]=(double)0x7FFFFFFF*sin(2*M_PI *(double)i/QE_RES);
 
     int A=0,B=0,X=0;
-    QEangle[0]=(8192-QE_OFFSET); // Reference angle
-    timer tmr;
+    QEdata.angle=(8192-QE_OFFSET); // Reference angle
     unsigned t;
+    timer tmr;
     char ct;
     int run=1;
-    pX:> X;
-    while(run){
-        select{
-        case pX when pinsneq(X):>X:
-            //printintln(X);
-            if(X)
-                run=0;
-            break;
-        case sinct_byref(c , ct):
-            c<:-1;
-            break;
 
-        }
-    }
-
-    tmr:> t;
     while(1){
-        tmr when timerafter(t + 100):>void; // debounce
         select{
         case pA when pinsneq(A) :> A:
             pB :> B;
-            tmr:> t;
             if(A) // posedge
-                QEangle[0] = B ? QEangle[0]-DIRECTION : QEangle[0]+DIRECTION;
+                QEdata.angle = B ? DOWN : UP ;
             else // negedge
-                QEangle[0] = B ? QEangle[0]+DIRECTION : QEangle[0]-DIRECTION;
+                QEdata.angle = B ? UP : DOWN ;
+            c<: translate(QEdata.angle);
             break;
         case pB when pinsneq(B) :> B:
             pA :> A;
-            tmr:> t;
             if(B)// posedge
-                QEangle[0] = A ? QEangle[0]+DIRECTION : QEangle[0]-DIRECTION;
+                QEdata.angle = A ? UP : DOWN ;
             else // negedge
-                QEangle[0] = A ? QEangle[0]-DIRECTION : QEangle[0]+DIRECTION;
-            //printint(QEangle[0]);
+                QEdata.angle = A ? DOWN : UP ;
+            c<: translate(QEdata.angle);
+            //printint(QEdata.angle);
             break;
-         case pX when pinsneq(X):>X:
-             if(X)
-                 QEangle[0]=(8192-QE_OFFSET); // Reference angle
+         case pX when pinsneq(X):> X:
+             if(X){
+                 tmr :>t; //Simple to use a 32 bit timer instead of a 16 bit port timer, due to wraparound
+                 QEdata.angle = (8192-QE_OFFSET); // Reference angle
+                 QEdata.dt = t - QEdata.old_t;
+                 QEdata.old_t = t;
+             }
+          break;
+         case c:> int _:
+             QEdata.angle=(8192-QE_OFFSET);
+             c<: QEdata.angle;
          break;
-        case sinct_byref(c , ct):
-                if(ct){
-                    c<:QEangle[0] & (QE_RES-1);
-                    break;
-                }
-        int a = QEangle[0] & (QE_RES-1);
-        c<: sin_tb[a]; // sin(fi)
-        a = (QEangle[0] +(QE_RES/4)) & (QE_RES-1);
-        c<: sin_tb[a]; // cos(fi)
+    /*    case sinct_byref(c , ct):
+            if(ct){
+                c<:QEdata.angle;
+                break;
+            }
+            int a = QEdata.angle;
+            c<: sin_tb[a]; // sin(fi)
+            a = (QEdata.angle +(QE_RES/4)) & (QE_RES-1);
+            c<: sin_tb[a]; // cos(fi)
 
         break;
+        */
         }
 
     }

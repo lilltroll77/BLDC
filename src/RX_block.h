@@ -7,10 +7,13 @@
 
 #ifndef RX_BLOCK_H_
 #define RX_BLOCK_H_
+#include "QE.h"
 
 #define PKG_SIZE 512 /*In bytes*/
-#define CODEVERSION 1
+#define CODEVERSION 2
 
+enum fuse_state_e{fuse_REPLACE=-1 , fuse_BLOWNED=0, CT_PAUSE=1 /*IN USE 0-3*/ , fuse_GOOD=4 , fuse_NOCHANGE=5 , fuse_SETCURRENT=6};
+#define CT_VERIFY 10
 
 struct midspeed_vector_t{
     int pos[PKG_SIZE/32];
@@ -36,14 +39,16 @@ struct USBmem_t{
     unsigned long long checknumber; //2
     unsigned version; //3
     unsigned index; //4
-    float temp; //5
-    int states; //6
-    unsigned DSPload;//7
-    unsigned reserved[16-7]; // UPDATE if new line is inserted
+    unsigned changed; //5
+    unsigned short DSPload; //5½
+    unsigned short temp; //6
+    unsigned short GateDrvStatus[6];// 7 8 9
+    unsigned w; //10
+    unsigned reserved[16-10]; // UPDATE if new line is inserted
     struct midspeed_vector_t mid;
     struct hispeed_vector_t fast;
 };
 
-unsafe void RX_block(streaming chanend c_from_gui , streaming chanend c_from_CDC , unsigned* unsafe angle);
+unsafe void RX_block(streaming chanend c_from_gui , streaming chanend c_from_CDC , struct QE_t* unsafe QEptr);
 
 #endif /* RX_BLOCK_H_ */

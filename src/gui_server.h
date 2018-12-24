@@ -20,9 +20,7 @@ struct hispeed_t{
     int Flux;
     int U;
     int angle;
-    unsigned CPUload;
-    unsigned FFTtrig;
-};
+   };
 
 
 struct DSPmem_t{
@@ -33,14 +31,14 @@ struct DSPmem_t{
 struct fuse_t{
     int current;
     int state;
+    int max;
 };
 
 struct sharedMem_t{
-    struct fuse_t fuse;
+    unsigned CPUload;
     struct DSPmem_t dsp[2];
 };
 
-unsafe void gui_server(streaming chanend c_from_RX , streaming chanend c_from_dsp);
 
 
 #endif /* GUI_SERVER_H_ */

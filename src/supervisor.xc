@@ -13,9 +13,11 @@
 #include "supervisor.h"
 
 extern void wait(unsigned clk);
+//Default values after hard reset
+const unsigned init_reg[] = {0 , 0 , 0 , 0x311, 0x711 , 0x19};
 
-void WriteToDRV8320S(unsigned addr , unsigned data , SPI_t &spi_r){
-    spi_r.CTRL <: 0b01; //enable !nSCS
+void WriteToDRV8320S(unsigned addr , unsigned data , SPI_t &spi_r , int ctrl){
+    spi_r.CTRL <: ctrl&1; //enable !nSCS
     wait(40);
     spi_r.CLK <: 0x55555555;
     unsigned word=bitrev((addr&0xF)<<27 | (data&0x7FF)<<16);
@@ -25,12 +27,12 @@ void WriteToDRV8320S(unsigned addr , unsigned data , SPI_t &spi_r){
     sync(spi_r.MOSI);
     stop_clock(spi_r.clkblk);
     wait(40);
-    spi_r.CTRL <: 0b11; //enable nSCS
+    spi_r.CTRL <: ctrl; //enable nSCS
     wait(4000);
 }
 
-unsigned ReadFromDRV8320S(unsigned addr , SPI_t &spi_r){
-    spi_r.CTRL <: 0b01; //enable !nSCS
+unsigned ReadFromDRV8320S(unsigned addr , SPI_t &spi_r , int ctrl){
+    spi_r.CTRL <: ctrl&1; //enable !nSCS
     wait(40);
     spi_r.CLK <: 0x55555555;
     unsigned word=bitrev((addr&0xF)<<27)|1;
@@ -42,7 +44,7 @@ unsigned ReadFromDRV8320S(unsigned addr , SPI_t &spi_r){
     sync(spi_r.MOSI);
     stop_clock(spi_r.clkblk);
     wait(40);
-    spi_r.CTRL <: 0b11; //enable nSCS
+    spi_r.CTRL <: ctrl; //enable nSCS
     unsigned long long miso;
     spi_r.MISO :> miso;
     wait(4000);
@@ -53,19 +55,17 @@ unsigned ReadFromDRV8320S(unsigned addr , SPI_t &spi_r){
     return bitrev(data1<<16)& 0x7FF;
 }
 
-void init_TIdriver( SPI_t &spi_r){
+int init_TIdriver( SPI_t &spi_r){
     spi_r.CTRL <: 0;
     wait(1000); //reset
-    spi_r.CTRL <: 3;
+    int ctrl=3;
+    spi_r.CTRL <: ctrl;
     wait(100000); // wait for ADC to stab
-    //WriteToDRV8320S( 0x2 , 0b0100000 , spi_r); // Driver control PWM3
-    //WriteToDRV8320S( 0x3 , 0x300 , spi_r); // OCP PWM3
-    unsigned reg[] = {0 , 0 , 0 , 0x312, 0x712 , 0x19};
 
     for(int addr=0; addr<=5 ; addr++){
-        int data=reg[addr];
-        WriteToDRV8320S( addr , data , spi_r); // OCP PWM3
-        int readback = ReadFromDRV8320S(addr , spi_r);
+        int data=init_reg[addr];
+        WriteToDRV8320S( addr , data , spi_r , ctrl); // OCP PWM3
+        int readback = ReadFromDRV8320S(addr , spi_r , ctrl);
         if(readback != data)
             printstrln("Error in SPI com. to TI gatedriver");
 #if(DEBUG)
@@ -73,6 +73,7 @@ void init_TIdriver( SPI_t &spi_r){
             printintln(readback);
 #endif
     }
+    return ctrl;
 }
 
 
@@ -157,67 +158,88 @@ void supervisor(server interface GUI_supervisor_interface supervisor_data , clie
     int button;
     unsigned char data[9] = {0};
     p_button :> button;
+    int fault , ctrl=3;
+    p_fault :>fault;
     unsigned t;
     timer tmr;
     short temp=0;
-    char info=0;
+    unsigned info= DRV_ERROR | DRV_SETTINGS;
+    supervisor_data.notification();
     tmr :> t;
 
     while(1){
         char ct;
+#pragma ordered
         select{
+            //highest priority
          case p_button when pinsneq(button):>button:
             if((button&1)==0 ){
-                spi_r.CTRL <:2;
-                printstr("SHUTDOWN");
+                ctrl=2;
+                spi_r.CTRL <:ctrl;
                 info |= SHUTDOWN;
-                supervisor_data.data_waiting();
-                while(1);
+                supervisor_data.notification();
+                printstrln("STOP!");
             }
             break;
-        case p_fault when pinseq(0):>void:
-            spi_r.CTRL <: 2;
+        case p_fault when pinsneq(fault):> fault:
+            if(fault || (ctrl==2))
+                break;
+            info |=DRV_ERROR;
+            supervisor_data.notification();
             printstrln("DRV ERROR");
             for(int addr=0 ; addr<=5 ; addr++){
-                int miso = ReadFromDRV8320S(addr , spi_r);
+                int miso = ReadFromDRV8320S(addr , spi_r , ctrl);
                 printint(addr);
                 printstr(": ");
                 printhexln(miso);
-                info |=DRV_ERROR;
             }
 
-            supervisor_data.data_waiting();
             break;
+        case supervisor_data.getInfo() -> int new_info:
+                new_info = info;
+                info=0;
+                break;
+        case supervisor_data.readTemperature(char ID) -> short temperature:
+                temperature = temp;
+                break;
+        case supervisor_data.readGateDriver(char reg) -> short data_reg:
+//                info |=!DRV_ERROR;
+                data_reg=ReadFromDRV8320S(reg , spi_r, ctrl);
+                break;
+        case supervisor_data.writeGateDriver(char reg , short val) -> int ack:
+                WriteToDRV8320S( reg , val , spi_r, ctrl); // OCP PWM3
+                int readback = ReadFromDRV8320S(reg , spi_r, ctrl);
+                if(readback != val)
+                    printstrln("Error in SPI com. to TI gatedriver");
+                ack=1;
+                break;
+        case supervisor_data.resetGateDriver() -> int ack:
+                if(ctrl==2) //Hard reset
+                    ctrl = init_TIdriver(spi_r);
+                else{  //soft reset
+                    spi_r.CTRL <:2;
+                    wait(1000);
+                    spi_r.CTRL <:3;
+                }
+
+                printstrln("Reset Done");
+                info=0;
+                info |=DRV_ERROR;
+                info |=DRV_SETTINGS;
+                ack=1;
+                supervisor_data.notification();
+
+                break;
+                //lowest priority
         case tmr when timerafter(5e7 + t):>void:
                 short new_temp  =  convert_and_read_scratch(termometer_data, data);
                 tmr:>t;
                 if(new_temp != temp) {
                     temp = new_temp;
-                    supervisor_data.data_waiting();
                     info |=TEMP_CHANGED;
+                    supervisor_data.notification();
+
                 }
-                break;
-         case supervisor_data.readTemperature(char ID) -> short temperature:
-                info &=!TEMP_CHANGED;
-                temperature = temp;
-                break;
-        case supervisor_data.readGateDriver(char reg) -> short data_reg:
-                info |=!DRV_ERROR;
-                data_reg=ReadFromDRV8320S(reg , spi_r);
-                break;
-        case supervisor_data.writeGateDriver(char reg , short val) -> int ack:
-                WriteToDRV8320S( reg , val , spi_r); // OCP PWM3
-                int readback = ReadFromDRV8320S(reg , spi_r);
-                if(readback != val)
-                    printstrln("Error in SPI com. to TI gatedriver");
-                ack=1;
-                break;
-        case supervisor_data.getInfo() -> int new_info:
-                new_info = info;
-                info=0;
-                break;
-        case supervisor_data.resetGateDriver() -> int ack:
-                ack=1;
                 break;
         }//select
     }

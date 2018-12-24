@@ -26,10 +26,27 @@ unsafe void cdc_handler1(client interface cdc_if cdc , client interface GUI_supe
     c_from_RX :> USBmem;
     c_from_FOC :> reg;
     c_from_FOC :> dsp_state;
-    //printf("CDCin %d" , reg);
+     //printf("CDCin %d" , reg);
     //printintln(val);
     while(1){
         select{
+        case supervisor.notification():
+            unsigned info = supervisor.getInfo();
+            USBmem[0].changed ^= info;
+            if(info &DRV_ERROR){ // Send error status reg to GUI
+                 for(int i=0; i <2 ; i++)
+                    USBmem[0].GateDrvStatus[i] = supervisor.readGateDriver(i);
+            }
+            if(info &DRV_SETTINGS){ // Send error status reg to GUI
+                for(int i=2; i <6 ; i++)
+                    USBmem[0].GateDrvStatus[i] = supervisor.readGateDriver(i);
+            }
+            if( info &TEMP_CHANGED ){
+                USBmem[0].temp = supervisor.readTemperature(0);
+
+            }
+
+            break;
         case c_from_RX :> writePtr:
            if( buffer_writing2host == InEPready){
                 XUD_SetReady_In(buff->tx.ep[1] ,(char*) writePtr , PKG_SIZE );
@@ -57,18 +74,9 @@ unsafe void cdc_handler1(client interface cdc_if cdc , client interface GUI_supe
                 switch(*buff->rx.read1++){
                  case streamOUT:
                     int state = *buff->rx.read1++;
-                    soutct(c_from_RX , 5); // Reset all states in RX
-                    if(state){
-                      // !! NEEDS  c_from_FOC <: EQsection; c_from_FOC <:  ptr;
-
-                        /*for(int i=0; i<4 ; i++){
-                        c_from_FOC <: -1; //Bypass section...
-                        c_from_FOC <: resetEQsec;
-                        c_from_FOC <: &dsp_state[i];//... and reset states
-                      }*/
-
+                    soutct(c_from_RX , 0); // Reset all states in RX
+                    if(state)
                         printf("stream out: ON\n");
-                    }
                     else
                         printf("stream out: OFF\n");
                     c_from_FOC <: streamOUT;
@@ -136,29 +144,24 @@ unsafe void cdc_handler1(client interface cdc_if cdc , client interface GUI_supe
                      const float gain = 16384.0f; // for testing
                      int current = gain*(buff->rx.read1[0] , float);
                      buff->rx.read1++;
-                     c_from_FOC <: FuseCurrent;
-                     c_from_FOC <: current;
+                     soutct(c_from_RX , fuse_SETCURRENT);
+                     c_from_RX <: current;
 
                      break;
-                 case FuseStatus:
-                     int state = buff->rx.read1[0];
-                     buff->rx.read1++;
-                     if(state){
-                         //Reset all states
-                         unsafe{
-                             for(int i=0; i<4 ; i++){
-                                 c_from_FOC <: resetEQsec;
-                                 c_from_FOC <: &dsp_state[i];
+                 case NewFuse:
+                     //Reset all states
+                     unsafe{
+                         for(int i=0; i<4 ; i++){
+                             c_from_FOC <: resetEQsec;
+                             c_from_FOC <: &dsp_state[i];
 
-                             }
-                             c_from_FOC <:resetPI;
-                             c_from_FOC <:0;
-                             c_from_FOC <:resetPI;
-                             c_from_FOC <:1;
                          }
+                         c_from_FOC <:resetPI;
+                         c_from_FOC <:0;
+                         c_from_FOC <:resetPI;
+                         c_from_FOC <:1;
                      }
-                     c_from_FOC <: FuseStatus;
-                     c_from_FOC <: state;
+                     soutct(c_from_RX , fuse_GOOD);
 
                      break;
                  case SignalSource:
@@ -233,6 +236,11 @@ unsafe void cdc_handler1(client interface cdc_if cdc , client interface GUI_supe
                      supervisor.writeGateDriver(LOSIDE_REG , reg_data);
                      printstr("COM IDRIVE: N-LS ");
                      printhex(data_val);printchar(',');printhexln(reg_data);
+                     break;
+                 case DRV_RESET:
+                     int data_val = *buff->rx.read1++;
+                     supervisor.resetGateDriver();
+                     //printstr("GATE-DRV RESET");
                      break;
                 default:
                     printf("Unknown command %d %d %d\n" , buff->rx.read1[0] , buff->rx.read1[1],buff->rx.read1[2]);

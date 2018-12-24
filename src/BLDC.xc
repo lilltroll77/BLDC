@@ -17,10 +17,10 @@
 #include "svm.h"
 #include "ports.h"
 #include "FOC.h"
+#include "QE.h"
+#include "decimate.h"
 
 
-extern void QE(streaming chanend c_out , in port pA , in port pB , in port pX , unsigned QEangle[1]);
-extern void decimate64(streaming chanend c , in buffered port:32 p , int offset);
 extern void wait(unsigned clk);
 
 #define ADC_OFFSET_A ((1<<20)-700)
@@ -33,12 +33,12 @@ int main(){
 
     par{
       on tile[1]:{
-          unsigned QEangle[1];
+          struct QE_t QEdata;
           unsafe{
-          unsigned* unsafe angle = QEangle;
+          struct QE_t* unsafe QEptr = &QEdata;
           par{
-              usb_server( sc_FOC2CDC , sc_GUI2RX , angle , supervisor_data);
-              QE(c_QE , QE_r.A , QE_r.B , QE_r.X , QEangle);
+              usb_server( sc_FOC2CDC , sc_GUI2RX , QEptr , supervisor_data);
+              QE(c_QE , QE_r.A , QE_r.B , QE_r.X , QE_r.clkblk , QEdata);
           }}
       }
 
@@ -63,17 +63,21 @@ int main(){
             configure_out_port(spi_r.CLK , spi_r.clkblk , 0);
             configure_out_port(p_svpwm ,clk_pwm ,0 );
 
-            init_TIdriver(spi_r);
+            par{
+                init_TIdriver(spi_r);
+                init_dec_tb();
+            }
+
             unsafe{
                 par{
-                decimate64(c_Idata[0] , DS.DATA_A , ADC_OFFSET_A);
-                decimate64(c_Idata[1] , DS.DATA_C , ADC_OFFSET_C);
-                FOC(c_Idata , c_QE ,c_FOC , sc_FOC2GUI , sc_FOC2CDC);
-                SVM( c_FOC , c_svm );
-                svpwm(c_svm , clk_pwm  ,p_svpwm );
-                supervisor_cores(supervisor_data , p_button , p_fault , spi_r , p_SCL);
-                gui_server(sc_GUI2RX , sc_FOC2GUI);
-             }}
+                    decimate64(c_Idata[0] , DS.DATA_A , ADC_OFFSET_A);
+                    decimate64(c_Idata[1] , DS.DATA_C , ADC_OFFSET_C);
+                    FOC(c_Idata , c_QE ,c_FOC , sc_FOC2GUI , sc_FOC2CDC);
+                    SVM( c_FOC , c_svm );
+                    svpwm(c_svm , clk_pwm  ,p_svpwm );
+                    supervisor_cores(supervisor_data , p_button , p_fault , spi_r , p_SCL);
+                    gui_server(sc_GUI2RX , sc_FOC2GUI);
+                }}
 
 
             } // tile[0]

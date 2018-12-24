@@ -82,9 +82,11 @@ struct regulator_t{
     struct EQ_t EQ[2];
 };
 
+#define CT 4
+
 enum INstatus_e{InEPready=-2 , BufferWritten=-1 , BufferReadyToWrite=0};
-enum message_e{streamOUT, PIsection , EQsection , resetPI , resetEQsec , resetEQ , FuseCurrent , FuseStatus , SignalSource , SignalGenerator,
-               DRV_VDS , DRV_ODT , DRV_TDRIVE , DRV_IDRIVE_P_HS , DRV_IDRIVE_N_HS , DRV_IDRIVE_P_LS , DRV_IDRIVE_N_LS};
+enum message_e{streamOUT, PIsection , EQsection , resetPI , resetEQsec , resetEQ , FuseCurrent , NewFuse , FuseStatus , SignalSource , SignalGenerator,
+               DRV_VDS , DRV_ODT , DRV_TDRIVE , DRV_IDRIVE_P_HS , DRV_IDRIVE_N_HS , DRV_IDRIVE_P_LS , DRV_IDRIVE_N_LS , DRV_RESET};
 enum signal_e{OFF , MLS18 , RND , SINE , OCTAVE};
 
 

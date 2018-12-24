@@ -22,6 +22,7 @@ typedef struct{
    in port X;
    in port A;
    in port B;
+   clock clkblk;
 }QE_t;
 
 struct p_t{
