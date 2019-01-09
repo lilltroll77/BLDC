@@ -16,8 +16,14 @@ enum message{SHUTDOWN=1 , DRV_ERROR=2 , DRV_SETTINGS=4 , TEMP_CHANGED=8 , FUSE_C
 #define HISIDE_REG 3
 #define LOSIDE_REG 4
 #define TDRIVE_REG 4
-#define ODT_REG 5
-#define VDS_REG 5
+#define DEAD_TIME_REG 5
+#define OCP_DEG_REG 5
+#define VDS_LVL_REG 5
+
+//values to SPI reg 2
+#define NORMAL 0
+#define BRAKE 2
+#define COAST 4
 
 
 

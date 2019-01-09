@@ -14,7 +14,7 @@
 
 extern void wait(unsigned clk);
 //Default values after hard reset
-const unsigned init_reg[] = {0 , 0 , 0 , 0x311, 0x711 , 0x19};
+const unsigned init_reg[] = {0 , 0 , 0 , 0x311, 0x611 , 0x19};
 
 void WriteToDRV8320S(unsigned addr , unsigned data , SPI_t &spi_r , int ctrl){
     spi_r.CTRL <: ctrl&1; //enable !nSCS
@@ -174,8 +174,13 @@ void supervisor(server interface GUI_supervisor_interface supervisor_data , clie
             //highest priority
          case p_button when pinsneq(button):>button:
             if((button&1)==0 ){
-                ctrl=2;
-                spi_r.CTRL <:ctrl;
+
+                WriteToDRV8320S( 2 , BRAKE , spi_r, ctrl);
+/* CODE BELOW SEEMS TO SELFDESTRUCT THE POWER MOSFETS
+                //ctrl=2;
+                //spi_r.CTRL <:ctrl;
+                 *
+               **********************************  */
                 info |= SHUTDOWN;
                 supervisor_data.notification();
                 printstrln("STOP!");
@@ -220,6 +225,7 @@ void supervisor(server interface GUI_supervisor_interface supervisor_data , clie
                     spi_r.CTRL <:2;
                     wait(1000);
                     spi_r.CTRL <:3;
+                    WriteToDRV8320S( 2 , NORMAL, spi_r, ctrl);
                 }
 
                 printstrln("Reset Done");

@@ -11,7 +11,7 @@
 
 
 //Ports
-on tile[0]:struct p_t DS={XS1_PORT_1M , XS1_PORT_1P , XS1_PORT_1G , XS1_PORT_1N , XS1_PORT_1O , XS1_PORT_1H ,XS1_CLKBLK_3};
+on tile[0]:struct p_t DS={XS1_PORT_1M , /* XS1_PORT_1P, */  XS1_PORT_1G , XS1_PORT_1N , XS1_PORT_1O , XS1_PORT_1H ,XS1_CLKBLK_3};
 on tile[0]:in port p_button = XS1_PORT_4E;
 on tile[0]:out port p_svpwm = XS1_PORT_8B;
 on tile[0]:in port p_fault = XS1_PORT_1L;

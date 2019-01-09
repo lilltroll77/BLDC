@@ -15,7 +15,7 @@
 #define DIRECTION (-1) // Can be 1 or (-1)
 
 //Set this value to 0 during first calibration run
-#define QE_OFFSET 274
+#define QE_OFFSET 403
 #define UP   (QEdata.angle+DIRECTION)&(QE_RES-1)
 #define DOWN (QEdata.angle-DIRECTION)&(QE_RES-1)
 
@@ -38,12 +38,12 @@ void QE(streaming chanend c , in port pA , in port pB , in port pX , clock clk ,
         sin_tb[i]=(double)0x7FFFFFFF*sin(2*M_PI *(double)i/QE_RES);
 
     int A=0,B=0,X=0;
-    QEdata.angle=(8192-QE_OFFSET); // Reference angle
+    QEdata.angle=0; // Reference angle
     unsigned t;
     timer tmr;
     char ct;
     int run=1;
-
+    int trigged=0;
     while(1){
         select{
         case pA when pinsneq(A) :> A:
@@ -52,7 +52,12 @@ void QE(streaming chanend c , in port pA , in port pB , in port pX , clock clk ,
                 QEdata.angle = B ? DOWN : UP ;
             else // negedge
                 QEdata.angle = B ? UP : DOWN ;
-            c<: translate(QEdata.angle);
+#if(CALIBRATE_QE)
+            if(trigged)
+                c<:QEdata.angle;
+#else
+                c<: translate(QEdata.angle);
+#endif
             break;
         case pB when pinsneq(B) :> B:
             pA :> A;
@@ -60,20 +65,35 @@ void QE(streaming chanend c , in port pA , in port pB , in port pX , clock clk ,
                 QEdata.angle = A ? UP : DOWN ;
             else // negedge
                 QEdata.angle = A ? DOWN : UP ;
-            c<: translate(QEdata.angle);
+#if(CALIBRATE_QE)
+            if(trigged)
+                c<:QEdata.angle;
+#else
+                c<: translate(QEdata.angle);
+#endif
             //printint(QEdata.angle);
             break;
          case pX when pinsneq(X):> X:
              if(X){
                  tmr :>t; //Simple to use a 32 bit timer instead of a 16 bit port timer, due to wraparound
-                 QEdata.angle = (8192-QE_OFFSET); // Reference angle
+#if(CALIBRATE_QE)
+                 QEdata.angle=0;
+                 c<:QEdata.angle;
+                 trigged=1;
+#else
+                 QEdata.angle = (QE_RES-QE_OFFSET); // Reference angle
                  QEdata.dt = t - QEdata.old_t;
                  QEdata.old_t = t;
+#endif
              }
           break;
+
          case c:> int _:
-             QEdata.angle=(8192-QE_OFFSET);
-             c<: QEdata.angle;
+#if(CALIBRATE_QE)
+             QEdata.angle = 1;
+#else
+             QEdata.angle = (QE_RES-QE_OFFSET); // Reference angle
+#endif
          break;
     /*    case sinct_byref(c , ct):
             if(ct){

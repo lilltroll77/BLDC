@@ -14,6 +14,25 @@
 
 #define DEBUG 0
 
+struct bitfield_t{
+    unsigned startbit;
+    unsigned length;
+    unsigned bitdata;
+};
+
+void setBits(client interface GUI_supervisor_interface supervisor , struct bitfield_t &field , short reg ){
+    unsigned bitfield = (1<<field.length)-1;
+    unsigned mask = bitfield << field.startbit;
+    unsigned reg_data = supervisor.readGateDriver(reg) & bitfield;
+    reg_data |= (field.bitdata << field.startbit);
+    supervisor.writeGateDriver( reg , reg_data);
+    printhex(field.bitdata);
+    printchar(',');
+    printhex(reg_data);
+    printchar(',');
+    printhexln(mask);
+}
+
 //cdc data is queued on a FIFO
 unsafe void cdc_handler1(client interface cdc_if cdc , client interface GUI_supervisor_interface supervisor  , streaming chanend c_from_FOC , streaming chanend c_from_RX, chanend c_ep_in[],XUD_buffers_t * unsafe buff){
     set_core_high_priority_off();
@@ -43,7 +62,6 @@ unsafe void cdc_handler1(client interface cdc_if cdc , client interface GUI_supe
             }
             if( info &TEMP_CHANGED ){
                 USBmem[0].temp = supervisor.readTemperature(0);
-
             }
 
             break;
@@ -174,71 +192,75 @@ unsafe void cdc_handler1(client interface cdc_if cdc , client interface GUI_supe
                      //c_fromSigGen <: buff->rx.read1[0];
                      buff->rx.read1++;
                      break;
-                 case DRV_VDS:
-                     int data_val = *buff->rx.read1++;
-                     short reg_data=supervisor.readGateDriver(VDS_REG);
-                     reg_data &=0xFF0;
-                     reg_data |=data_val;
-                     supervisor.writeGateDriver(VDS_REG , reg_data);
-                     printstr("COM VDS: ");
-                     printhex(data_val);printchar(',');printhexln(reg_data);
-                     break;
-                 case DRV_ODT:
-                     int data_val = *buff->rx.read1++;
-                     short reg_data=supervisor.readGateDriver(ODT_REG);
-                     reg_data &=0x4FF;
-                     reg_data |=data_val<<8;
-                     supervisor.writeGateDriver(ODT_REG , reg_data);
-                     printstr("COM ODT:");
-                     printhex(data_val);printchar(',');printhexln(reg_data);
-                     break;
-                 case DRV_TDRIVE:
-                     int data_val = *buff->rx.read1++;
-                     short reg_data=supervisor.readGateDriver(TDRIVE_REG);
-                     reg_data &=0x4FF;
-                     reg_data |=data_val<<8;
-                     supervisor.writeGateDriver(TDRIVE_REG , reg_data);
-                     printstr("COM TDRIVE:");
-                     printhex(data_val);printchar(',');printhexln(reg_data);
-                     break;
                  case DRV_IDRIVE_P_HS:
-                     int data_val = *buff->rx.read1++;
-                     short reg_data=supervisor.readGateDriver(HISIDE_REG);
-                     reg_data &=0xF0F;
-                     reg_data |=data_val<<4;
-                     supervisor.writeGateDriver(HISIDE_REG , reg_data);
+                     struct bitfield_t bitfield;
+                     bitfield.bitdata = *buff->rx.read1++;
+                     bitfield.length = 4;
+                     bitfield.startbit = 4;
                      printstr("COM IDRIVE: P-HS ");
-                     printhex(data_val);printchar(',');printhexln(reg_data);;
+                     setBits(supervisor , bitfield , HISIDE_REG);
                      break;
                  case DRV_IDRIVE_N_HS:
-                     int data_val = *buff->rx.read1++;
-                     short reg_data=supervisor.readGateDriver(HISIDE_REG);
-                     reg_data &=0xFF0;
-                     reg_data |=data_val;
-                     supervisor.writeGateDriver(HISIDE_REG , reg_data);
+                     struct bitfield_t bitfield;
+                     bitfield.bitdata = *buff->rx.read1++;
+                     bitfield.length = 4;
+                     bitfield.startbit = 0;
                      printstr("COM IDRIVE: N-HS ");
-                     printhex(data_val);printchar(',');printhexln(reg_data);
+                     setBits(supervisor , bitfield , HISIDE_REG);
+                     break;
+                 case DRV_TDRIVE://peak gate-current drive time
+                     struct bitfield_t bitfield;
+                     bitfield.bitdata = *buff->rx.read1++;
+                     bitfield.length = 2;
+                     bitfield.startbit = 8;
+                     printstr("COM DRIVE TIME:");
+                     setBits(supervisor , bitfield , TDRIVE_REG);
                      break;
                  case DRV_IDRIVE_P_LS:
-                     int data_val = *buff->rx.read1++;
-                     short reg_data=supervisor.readGateDriver(LOSIDE_REG);
-                     reg_data &=0xF0F;
-                     reg_data |=data_val<<4;
-                     supervisor.writeGateDriver(LOSIDE_REG, reg_data);
+                     struct bitfield_t bitfield;
+                     bitfield.bitdata = *buff->rx.read1++;
+                     bitfield.length = 4;
+                     bitfield.startbit = 4;
                      printstr("COM IDRIVE: P-LS ");
-                     printhex(data_val);printchar(',');printhexln(reg_data);
+                     setBits(supervisor , bitfield , LOSIDE_REG);
                      break;
                  case DRV_IDRIVE_N_LS:
-                     int data_val = *buff->rx.read1++;
-                     short reg_data=supervisor.readGateDriver(LOSIDE_REG);
-                     reg_data &=0xFF0;
-                     reg_data |=data_val;
-                     supervisor.writeGateDriver(LOSIDE_REG , reg_data);
+                     struct bitfield_t bitfield;
+                     bitfield.bitdata = *buff->rx.read1++;
+                     bitfield.length = 4;
+                     bitfield.startbit = 0;
                      printstr("COM IDRIVE: N-LS ");
-                     printhex(data_val);printchar(',');printhexln(reg_data);
+                     setBits(supervisor , bitfield , LOSIDE_REG);
                      break;
+                     //DRV_DEADTIME , OCP_DEG , DRV_VDS_LVL ,
+                 case DRV_DEADTIME://dead time
+                     struct bitfield_t bitfield;
+                     bitfield.bitdata = *buff->rx.read1++;
+                     bitfield.length = 2;
+                     bitfield.startbit = 8;
+                     printstr("COM DEADTIME:");
+                     setBits(supervisor , bitfield , DEAD_TIME_REG);
+                     break;
+                 case DRV_OCP_DEG: //Overcurrent deglitch time
+                     struct bitfield_t bitfield;
+                     bitfield.bitdata = *buff->rx.read1++;
+                     bitfield.length = 2;
+                     bitfield.startbit = 4;
+                     printstr("COM Overcurrent deglitch time: ");
+                     setBits(supervisor , bitfield , OCP_DEG_REG);
+                     break;
+                 case DRV_VDS_LVL:
+                     struct bitfield_t bitfield;
+                     bitfield.bitdata = *buff->rx.read1++;
+                     bitfield.length = 4;
+                     bitfield.startbit = 0;
+                     printstr("COM VDS_LVL: ");
+                     setBits(supervisor , bitfield , VDS_LVL_REG);
+                     break;
+
                  case DRV_RESET:
                      int data_val = *buff->rx.read1++;
+                     c_from_FOC  <: DRV_RESET;
                      supervisor.resetGateDriver();
                      //printstr("GATE-DRV RESET");
                      break;

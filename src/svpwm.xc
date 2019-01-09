@@ -5,18 +5,25 @@
  *      Author: Mikael Bohman
  */
 #include "xs1.h"
+#include "platform.h"
 #include "svm.h"
 #include "typedefs.h"
 #include <print.h>
+#define TRIGGER 1
+
+on tile[0]: out port p_trigger = XS1_PORT_1P; //DS_B
 
 void svpwm(streaming chanend c , clock clk , out port p_svm){
 set_core_high_priority_on();
     int t=0;
     unsafe{
         svm_t* unsafe svm;
+        set_port_clock(p_trigger , clk);
         c :> svm;
 
+
         start_clock(clk);
+
 
         while(1){
             t += svm->t_before;
@@ -52,7 +59,9 @@ set_core_high_priority_on();
         p_svm @ t<: svm->zero;
         t += svm->t_after;
 
+        p_trigger <:0;
         c :> svm;
+        p_trigger@t <:1;
         //printintln(svm->t0);
 
         } // while

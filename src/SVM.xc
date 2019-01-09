@@ -14,7 +14,6 @@
 #include "gui_server.h"
 #include "foc.h"
 
-#define request_FOCdata soutct(c_in ,0)
 
 unsafe void SVM(streaming chanend c_in , streaming chanend c_out ){
     int sin_tb[SIN_TBL_LEN+2];
@@ -22,7 +21,7 @@ unsafe void SVM(streaming chanend c_in , streaming chanend c_out ){
 
     int angle=0;
     unsigned e1=0,e2=0;
-    int amp=0xFFFF;
+    int amp=0;
     int buffer=0;
 
     //Switching vector
@@ -36,14 +35,14 @@ unsafe void SVM(streaming chanend c_in , streaming chanend c_out ){
 #define SV_LEN 8
     struct SpaceVector_t SpaceVector[SV_LEN]=
     {
-            { HI , LO , LO },  // A -> B&C
-            { HI , HI , LO },  // A&B -> C
-            { LO , HI , LO },  // B -> A&C
-            { LO , HI , HI },  // B&C -> A
-            { LO , LO , HI },  // C -> A&B
-            { HI , LO , HI },   // A&C -> B
-            { HI , LO , LO },  // copy of first
-            { LO , LO , LO }
+            { HI , LO , LO },  //1. A -> B&C
+            { HI , HI , LO },  //2. A&B -> C
+            { LO , HI , LO },  //3. B -> A&C
+            { LO , HI , HI },  //4. B&C -> A
+            { LO , LO , HI },  //5. C -> A&B
+            { HI , LO , HI },  //6. A&C -> B
+            { HI , LO , LO },  // copy of 1
+            { LO , LO , LO },  // BRAKE
     };
 
 
@@ -73,12 +72,28 @@ unsafe void SVM(streaming chanend c_in , streaming chanend c_out ){
     struct hispeed_t* unsafe mem[2];
     c_in :> mem[0];
     c_in :> mem[1];
-    request_FOCdata;
+    c_in <: angle;
     unsigned counter=0;
 #pragma unsafe arrays
+    int sector , next_sector, diff;
     while(1){
-        counter++;
-#if(CALIBRATE_QE==1)
+        select{
+            //For development. If FOC core does not send data in time, the old data will be used.
+        case c_in :> angle:
+            if(angle<0)
+                angle += WRAP;
+            else if(angle >= WRAP)
+                angle -= WRAP;
+            c_in <: angle;
+
+            sector = (angle>>SIN_TBL_BITS); // [0 - 5]
+            next_sector = sector+1; // [1-6]
+
+
+            c_in :> amp;
+       break;
+        default:
+#if(0)
         select{
             case c_in :> int df:
                 angle +=df;
@@ -90,37 +105,31 @@ unsafe void SVM(streaming chanend c_in , streaming chanend c_out ){
                 break;
         }
 #else
-     c_in :> angle;
-     c_in :> amp;
-     request_FOCdata;
 #endif
 
-        if(angle<0)
-            angle += (6*SIN_TBL_LEN);
-        else if(angle>= (6*SIN_TBL_LEN) )
-            angle -= 6*SIN_TBL_LEN;
+
         //c_in :> mem;
         mem[buffer]->angle = angle;
         mem[buffer]->U = amp;
 
         if(amp==0){
             //ADC will loose supply voltage if output is free floating
-            svm[buffer].p1 = lut[7];
-            svm[buffer].p2 = lut[7];
+            svm[buffer].p1 = lut[(SV_LEN-1)];
+            svm[buffer].p2 = lut[(SV_LEN-1)];
             svm[buffer].t1=100;
             svm[buffer].t2=100;
         }
         else{
 
 
-        int sector = angle>>SIN_TBL_BITS;
+
+
+        int fi2 = angle & (SIN_TBL_LEN-1); // 0 - 60 deg within sector
+        svm[buffer].p2 = lut[next_sector];
+
 
         svm[buffer].p1 = lut[sector];
-        int fi2 = angle - (sector<<SIN_TBL_BITS);
-
-        int next_sector = sector+1;
-        svm[buffer].p2 = lut[next_sector];
-        int fi1 = (next_sector<<SIN_TBL_BITS) - angle;
+        int fi1 = SIN_TBL_LEN - fi2; // complement 60 - fi2
 
 
 
@@ -166,7 +175,8 @@ unsafe void SVM(streaming chanend c_in , streaming chanend c_out ){
             c_out <: ptr;
         }
         buffer = !buffer;
-
+        break;
+        }
 
 
     }

@@ -27,7 +27,7 @@ typedef struct{
 
 struct p_t{
     in buffered port:32 DATA_A;
-    in buffered port:32 DATA_B;
+    //in buffered port:32 DATA_B;
     in buffered port:32 DATA_C;
     out port clk_A;
     out port clk_B;

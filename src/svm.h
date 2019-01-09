@@ -12,7 +12,8 @@
 #define SIN_TBL_LEN (1<<SIN_TBL_BITS)
 #define CLKDIV 13
 #define Tp (64*2*CLKDIV)
-#define WRAP (SIN_TBL_LEN*6)
+#define SECTORS 6
+#define WRAP (SECTORS*SIN_TBL_LEN)
 #define DECIMATE 128
 
 unsafe void SVM(streaming chanend c_in , streaming chanend c_out);

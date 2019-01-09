@@ -147,56 +147,12 @@ unsafe void FOC(streaming chanend c_I[2] , streaming chanend c_fi , streaming ch
     int ctrl=0;
     //printint(t[1]-t[0]);
 
-#if(CALIBRATE_QE)
-    int fi=-1 , angle;
-    //Find trigger
-    while(fi<0){
-        tmr1 when timerafter(t[0] + 2e4):> t[0];
-        c_out<: 1;
-        soutct( c_fi , CT );
-        c_fi :> fi;
-        c_out:> angle;
-    }
-    for(int i=0; i<2048 ;i++){
-        tmr1 when timerafter(t[0] + 1e4):> t[0];
-        c_out<: 1;
-        c_out:> angle;
-    }
-    soutct( c_fi , CT );
-    c_fi :> fi;
-    if(fi>4096)
-        printf("Motor spins in wrong direction\n");
-    else{
-
-    while(1){
-        int mean=0;
-        for(int i=0; i<(1<<14) ; i++){
-            tmr1 when timerafter(t[0] + 1e4):> t[0];
-            soutct( c_fi , CT );
-            if(angle > (3*SIN_TBL_LEN))
-                c_out<: 1;
-            else if(angle > 0)
-                c_out<: -1;
-            else
-                c_out<: 0;
-            c_fi :> fi;
-            mean += fi;
-            c_out :> angle;
-        }
-        printf("QE Offset = %d\n" , mean>>14);
-
-    }
-
-    }
-}
-
- #else
     unsigned counter=1;
     int fi;
     int Vout = 0x2000;
     int FOCangle=0;
-
-    const int iMax_init=3*AMPERE;
+    const int AMPS = 3;
+    const int iMax_init=AMPS*AMPERE;
     if(iMax_init > 25*(1<<15)){
         printf("Incorrect current settings\n Limit will clip in ADC\nABORTING!\n");
         while(1);
@@ -217,7 +173,7 @@ do{
         char ct;
         int iA=0x80000000 , iC=0x80000000;
         select{
-        case sinct_byref(c_out , ct):
+        case c_out :> int _:
             c_out <: 0;
             c_out <: 0;
             if((iA < Ierror) & (iC < Ierror))
@@ -236,8 +192,6 @@ do{
         }
     }while(samples!=0);
     printstrln("ADC OK");
-    c_out <: 0;
-    c_out <: 0;
 
     //Force motor to FOCangle=0 position with a DC current
 
@@ -248,7 +202,7 @@ do{
         int i;
         char ct;
         select{
-        case sinct_byref(c_out , ct):
+        case c_out :> FOCangle:
             samples++;
             c_out <: FOCangle;
             c_out <: Vout;
@@ -276,31 +230,31 @@ do{
         break;
         }
     }while(cont);
-    //reset QE until real calib is done based on QE trigger
-    c_fi <:0;
-    c_fi :> fi;
-    //Vout = 0x1000;
-    printstrln("OK");
 
 
-    tmr :> t;
+    fi=0;
+    c_fi <:fi; // reset QE angle
 
-    char ct_fuse=fuse_GOOD;
-    char ct;
+//Now rotate the field 90 deg.
+    FOCangle = (3*1024/2);
+
+    char ct_fuse=fuse_GOOD , ct;
+    unsigned fi_FOC;
+    samples=0;
+#if(CALIBRATE_QE)
+    printstrln("Searching for trigger");
+    int QEmean=0;
+#endif
+    int trigged=0;
+#define SHIFT 5
+    Vout <<=SHIFT;
+    int Voutref = Vout/AMPS;
         while(1){
         select{
-            case tmr when timerafter(t + 3e8) :> t:
-                    if(ct_fuse != fuse_GOOD)
-                        break;
-                    if(FOCangle < (3*1024)/2 ) //Rotate vector 90 deg step by step
-                        FOCangle++;
-                    else if(Vout<0x7FFF) //Then increase voltage
-                        Vout++;
-            break;
-            case sinct_byref(c_gui_server , ct_fuse):
+           case sinct_byref(c_gui_server , ct_fuse):
                 if(ct_fuse == fuse_BLOWNED){
-                    Vout=0;
-                    FOCangle=0;
+                    //Vout=0;
+                    //FOCangle=0;
                     printchar('B');
                 }
                 else
@@ -308,11 +262,49 @@ do{
 
 
             break;
-            case sinct_byref(c_out , ct): // new calc requested
+#if(CALIBRATE_QE)
+           case c_out:> fi_FOC: // new calc requested
             //writeCPUloadNow( told , tmr1,  &shared_mem.CPUload);
+
+            if(samples==0){
+                if((trigged>0) & (fi_FOC ==0)){
+                    int QEpoint = fi%(8192/7);
+                    QEmean +=QEpoint;
+                    printint(QEpoint);
+                    printstr(", mean QE_OFFSET value=");
+                    printintln(QEmean/trigged);
+                    trigged++;
+                }
+
+                samples=100;
+                fi_FOC++;
+
+            }
+            else
+                samples--;
+            c_out <: fi_FOC;
+            c_out <: Vout>>SHIFT;
+#else
+           case c_out:>int _:
+
+            c_out <: fi+FOCangle;
+            c_out <: Vout>>SHIFT;
+            if(Vout< (AMPS*Voutref) )
+                Vout++;
+
+#endif
+
+/*
             c_out <: fi + FOCangle;
             c_out <: Vout;
+            samples++;
 
+            if((samples& 0xF) ==0){
+               if(Vout<0x7FFF)
+                    Vout++;
+
+            }
+*/
             //c_out <: mem;
             //Scale from QE angle to Space vector angle
 
@@ -348,7 +340,15 @@ do{
             //writeCPUloadNow( told , tmr1,  &shared_mem.CPUload);
 
         break;
-        case c_fi:> fi:
+           case c_fi:> fi:
+#if(CALIBRATE_QE)
+            if(!trigged & (fi==0)){
+               printstrln("QE trigger found. Testing magnetic sectors");
+               printstrln("DO NOT ATTACH ANY LOAD TO MOTOR!");
+               printstrln("WARNING: Motor might get hot! Manual supervision needed");
+               trigged=1;
+            }
+#endif
             break;
 /* I should be in sync with U !*/
         case c_I[0]:> mem->IA:
@@ -415,6 +415,9 @@ do{
             case SignalSource:
                 c_from_CDC :> int signalsource;
                 break;
+            case DRV_RESET:
+                Vout=Voutref;
+                break;
             default:
                 printstr("Error in FOC: Unknown command\n");
                 break;
@@ -425,7 +428,7 @@ do{
 }
 
 
-#endif
+
 
 
 
