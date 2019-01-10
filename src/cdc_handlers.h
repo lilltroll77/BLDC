@@ -85,7 +85,7 @@ struct regulator_t{
 #define CT 4
 
 enum INstatus_e{InEPready=-2 , BufferWritten=-1 , BufferReadyToWrite=0};
-enum message_e{streamOUT, PIsection , EQsection , resetPI , resetEQsec , resetEQ , FuseCurrent , NewFuse , FuseStatus , SignalSource , SignalGenerator,
+enum message_e{streamOUT, PIsection , EQsection , resetPI , resetEQsec , resetEQ , FuseCurrent , NewFuse , FuseStatus , SignalSource , SignalGenerator, PWMmod,
                DRV_IDRIVE_P_HS , DRV_IDRIVE_N_HS,
                DRV_TDRIVE, DRV_IDRIVE_P_LS , DRV_IDRIVE_N_LS ,
                DRV_DEADTIME , DRV_OCP_DEG , DRV_VDS_LVL ,

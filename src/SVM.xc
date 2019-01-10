@@ -32,7 +32,7 @@ unsafe void SVM(streaming chanend c_in , streaming chanend c_out ){
     };
     enum gate{HI_Z=0 , LO=1 , HI = 2};
     //from https://en.wikipedia.org/wiki/Space_vector_modulation
-#define SV_LEN 8
+#define SV_LEN 9
     struct SpaceVector_t SpaceVector[SV_LEN]=
     {
             { HI , LO , LO },  //1. A -> B&C
@@ -43,6 +43,7 @@ unsafe void SVM(streaming chanend c_in , streaming chanend c_out ){
             { HI , LO , HI },  //6. A&C -> B
             { HI , LO , LO },  // copy of 1
             { LO , LO , LO },  // BRAKE
+            { HI_Z , HI_Z , HI_Z },  // COAST
     };
 
 
@@ -114,8 +115,8 @@ unsafe void SVM(streaming chanend c_in , streaming chanend c_out ){
 
         if(amp==0){
             //ADC will loose supply voltage if output is free floating
-            svm[buffer].p1 = lut[(SV_LEN-1)];
-            svm[buffer].p2 = lut[(SV_LEN-1)];
+            svm[buffer].p1 = lut[(SV_LEN-2)];
+            svm[buffer].p2 = lut[(SV_LEN-2)];
             svm[buffer].t1=100;
             svm[buffer].t2=100;
         }

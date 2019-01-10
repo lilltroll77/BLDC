@@ -11,6 +11,7 @@
 #include "cdc_handlers.h"
 #include "RX_block.h"
 #include "calc.h"
+#include "FOC.h"
 
 #define DEBUG 0
 
@@ -191,6 +192,13 @@ unsafe void cdc_handler1(client interface cdc_if cdc , client interface GUI_supe
                      //printint(buff->rx.read1[0]);
                      //c_fromSigGen <: buff->rx.read1[0];
                      buff->rx.read1++;
+                     break;
+                 case PWMmod:
+                     int Vout = *buff->rx.read1++;
+                     //printintln(Vout);
+                     Vout *=(PWM_MAX-PWM_MIN)/100;
+                     c_from_FOC <: PWMmod;
+                     c_from_FOC <: Vout;
                      break;
                  case DRV_IDRIVE_P_HS:
                      struct bitfield_t bitfield;

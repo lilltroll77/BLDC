@@ -13,6 +13,11 @@
 //The value that corresponds to 1A
 #define AMPERE 1<<15; // 1<<20 => 32A / clipped peak value
 
+#define PWM_MAX 37000
+#define PWM_MIN ((PWM_MAX*5)/100) // 5%
+
+#define dV_LIMIT 8 //Smaller value gives lower dV/dt
+
 struct state_t{
     s64 y1;
     s64 y2;

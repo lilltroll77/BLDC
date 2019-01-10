@@ -20,7 +20,7 @@
 
 #define DEBUG 0
 
-
+extern void wait(unsigned clk);
 
 unsafe void gui_server(streaming chanend c_from_RX , streaming chanend c_from_dsp){
     set_core_high_priority_off();
@@ -30,7 +30,8 @@ unsafe void gui_server(streaming chanend c_from_RX , streaming chanend c_from_ds
     #pragma unsafe arrays
 
     c_from_dsp :> shared_mem;
-    int fuse_current= 32<<14; //32 [A] default
+    int fuse_current= 33*AMPERE; //32 [A] default
+    fuse_current = 0x7FFFFFFF;
     char fuse_state=1;
 
     timer tmr;
@@ -48,7 +49,8 @@ unsafe void gui_server(streaming chanend c_from_RX , streaming chanend c_from_ds
                     soutct(c_from_dsp , fuse_state);
                 }
                 else{
-                    fuse_current = fuse_data;
+                    //NOT ACTIVE
+                    //fuse_current = fuse_data;
                     //printintln(fuse_current);
                 }
 
@@ -141,15 +143,13 @@ unsafe void FOC(streaming chanend c_I[2] , streaming chanend c_fi , streaming ch
     c_out <:(struct hispeed_t* unsafe) &shared_mem.dsp[0].fast;
     c_out <:(struct hispeed_t* unsafe) &shared_mem.dsp[1].fast;
 
-    timer tmr1;
-    unsigned told;
-    int block=0;
     int ctrl=0;
     //printint(t[1]-t[0]);
 
     unsigned counter=1;
     int fi;
-    int Vout = 0x2000;
+    int VoutSet = 0;
+    int Vout=0;
     int FOCangle=0;
     const int AMPS = 3;
     const int iMax_init=AMPS*AMPERE;
@@ -205,10 +205,10 @@ do{
         case c_out :> FOCangle:
             samples++;
             c_out <: FOCangle;
-            c_out <: Vout;
+            c_out <: VoutSet;
              if((samples&0x7)==0){
-                Vout++;
-                if(Vout==0x7FFF) // Increase voltage until Vmax
+                VoutSet++;
+                if(VoutSet==0x7FFF) // Increase voltage until Vmax
                     cont=0;
             }
         break;
@@ -231,6 +231,7 @@ do{
         }
     }while(cont);
 
+    wait(5e7);
 
     fi=0;
     c_fi <:fi; // reset QE angle
@@ -238,27 +239,30 @@ do{
 //Now rotate the field 90 deg.
     FOCangle = (3*1024/2);
 
-    char ct_fuse=fuse_GOOD , ct;
-    unsigned fi_FOC;
+    char ct_fuse=fuse_GOOD;
     samples=0;
 #if(CALIBRATE_QE)
     printstrln("Searching for trigger");
     int QEmean=0;
 #endif
-    int trigged=0;
-#define SHIFT 5
-    Vout <<=SHIFT;
-    int Voutref = Vout/AMPS;
+    int fuse=1;
+
+
+    VoutSet=0;
         while(1){
         select{
            case sinct_byref(c_gui_server , ct_fuse):
                 if(ct_fuse == fuse_BLOWNED){
-                    //Vout=0;
+                    VoutSet=0;
+                    Vout=0;
+                    fuse=0;
                     //FOCangle=0;
-                    printchar('B');
+                    printstrln("Blown fuse");
                 }
-                else
-                    printchar('G');
+                else{
+                    printstrln("New fuse");
+                    fuse=1;
+                }
 
 
             break;
@@ -283,25 +287,39 @@ do{
             else
                 samples--;
             c_out <: fi_FOC;
-            c_out <: Vout>>SHIFT;
+            c_out <: VoutSet>>SHIFT_OUT;
 #else
            case c_out:>int _:
 
-            c_out <: fi+FOCangle;
-            c_out <: Vout>>SHIFT;
-            if(Vout< (AMPS*Voutref) )
-                Vout++;
+            if(Vout < VoutSet)
+                Vout += dV_LIMIT;
+            else if(Vout > VoutSet)
+                Vout -=dV_LIMIT;
+            if(Vout<0){
+                c_out <: fi-FOCangle;
+                c_out <: -Vout + PWM_MIN;
+            }else if(Vout>0){
+                c_out <: fi+FOCangle;
+                c_out <: Vout + PWM_MIN;
+            }
+            else{
+                c_out <: fi;
+                c_out <: 0;
+            }
+
+
+
 
 #endif
 
 /*
             c_out <: fi + FOCangle;
-            c_out <: Vout;
+            c_out <: VoutSet;
             samples++;
 
             if((samples& 0xF) ==0){
-               if(Vout<0x7FFF)
-                    Vout++;
+               if(VoutSet<0x7FFF)
+                    VoutSet++;
 
             }
 */
@@ -415,8 +433,14 @@ do{
             case SignalSource:
                 c_from_CDC :> int signalsource;
                 break;
+            case PWMmod:
+                if(fuse)
+                    c_from_CDC :> VoutSet;
+                else
+                    c_from_CDC :> int _;
+                break;
             case DRV_RESET:
-                Vout=Voutref;
+                VoutSet=0;
                 break;
             default:
                 printstr("Error in FOC: Unknown command\n");
