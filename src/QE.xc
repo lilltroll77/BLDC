@@ -25,7 +25,7 @@ int translate(int fi){
     return ((FOC_SECTORS*7)*fi)%(FOC_SECTORS*8192)>>3;
 }
 
-void QE(streaming chanend c , in port pA , in port pB , in port pX , clock clk , struct QE_t &QEdata){
+void QE(streaming chanend c , streaming chanend c_fromCDC , in port pA , in port pB , in port pX , clock clk , struct QE_t &QEdata){
     set_core_high_priority_on();
     set_clock_div(clk , 25); //Create 2 MHz clock to handle debounce
     set_port_clock(pX , clk);
@@ -44,6 +44,7 @@ void QE(streaming chanend c , in port pA , in port pB , in port pX , clock clk ,
     char ct;
     int run=1;
     int trigged=0;
+    int refAngle = (QE_RES-QE_OFFSET);
     while(1){
         select{
         case pA when pinsneq(A) :> A:
@@ -81,7 +82,7 @@ void QE(streaming chanend c , in port pA , in port pB , in port pX , clock clk ,
                  c<:QEdata.angle;
                  trigged=1;
 #else
-                 QEdata.angle = (QE_RES-QE_OFFSET); // Reference angle
+                 QEdata.angle = refAngle; // Reference angle
                  QEdata.dt = t - QEdata.old_t;
                  QEdata.old_t = t;
 #endif
@@ -92,9 +93,12 @@ void QE(streaming chanend c , in port pA , in port pB , in port pX , clock clk ,
 #if(CALIBRATE_QE)
              QEdata.angle = 1;
 #else
-             QEdata.angle = (QE_RES-QE_OFFSET); // Reference angle
+             QEdata.angle = refAngle; // Reference angle
 #endif
          break;
+         case c_fromCDC :> int trim:
+             refAngle = (QE_RES-QE_OFFSET)+ trim;
+             break;
     /*    case sinct_byref(c , ct):
             if(ct){
                 c<:QEdata.angle;

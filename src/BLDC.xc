@@ -27,7 +27,7 @@ extern void wait(unsigned clk);
 #define ADC_OFFSET_C ((1<<20)-1700)
 
 int main(){
-    streaming chan c_Idata[2], c_QE, c_FOC,c_svm;
+    streaming chan c_Idata[2], c_QE, c_FOC,c_svm , sc_QE2CDC;
     interface GUI_supervisor_interface supervisor_data;
     streaming chan sc_GUI2RX , sc_FOC2CDC , sc_FOC2GUI;
 
@@ -37,8 +37,8 @@ int main(){
           unsafe{
           struct QE_t* unsafe QEptr = &QEdata;
           par{
-              usb_server( sc_FOC2CDC , sc_GUI2RX , QEptr , supervisor_data);
-              QE(c_QE , QE_r.A , QE_r.B , QE_r.X , QE_r.clkblk , QEdata);
+              usb_server( sc_FOC2CDC , sc_GUI2RX , sc_QE2CDC , QEptr , supervisor_data);
+              QE(c_QE , sc_QE2CDC , QE_r.A , QE_r.B , QE_r.X , QE_r.clkblk , QEdata);
           }}
       }
 

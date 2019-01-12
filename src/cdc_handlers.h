@@ -85,7 +85,7 @@ struct regulator_t{
 #define CT 4
 
 enum INstatus_e{InEPready=-2 , BufferWritten=-1 , BufferReadyToWrite=0};
-enum message_e{streamOUT, PIsection , EQsection , resetPI , resetEQsec , resetEQ , FuseCurrent , NewFuse , FuseStatus , SignalSource , SignalGenerator, PWMmod,
+enum message_e{streamOUT, PIsection , EQsection , resetPI , resetEQsec , resetEQ , FuseCurrent , NewFuse , FuseStatus , SignalSource , SignalGenerator, PWMmod, QEtrim,
                DRV_IDRIVE_P_HS , DRV_IDRIVE_N_HS,
                DRV_TDRIVE, DRV_IDRIVE_P_LS , DRV_IDRIVE_N_LS ,
                DRV_DEADTIME , DRV_OCP_DEG , DRV_VDS_LVL ,
@@ -93,7 +93,7 @@ enum message_e{streamOUT, PIsection , EQsection , resetPI , resetEQsec , resetEQ
 enum signal_e{OFF , MLS18 , RND , SINE , OCTAVE};
 
 
-unsafe void cdc_handler1(client interface cdc_if cdc ,  client interface GUI_supervisor_interface supervisor  , streaming chanend c_from_dsp , streaming chanend c_from_RX , chanend c_ep_in[], XUD_buffers_t * unsafe buff);
+unsafe void cdc_handler1(client interface cdc_if cdc ,  client interface GUI_supervisor_interface supervisor  , streaming chanend c_from_dsp , streaming chanend c_from_RX , streaming chanend c_from_QE , chanend c_ep_in[], XUD_buffers_t * unsafe buff);
 
 
 #endif /* CDC_HANDLERS_H_ */

@@ -10,7 +10,7 @@
 #include "cdc_handlers.h"
 #include "QE.h"
 
-unsafe void usb_server(streaming chanend c_FOC2CDC , streaming chanend sc_GUI2RX , struct QE_t* unsafe QEptr , client interface GUI_supervisor_interface supervisor_data );
+unsafe void usb_server(streaming chanend c_FOC2CDC , streaming chanend sc_GUI2RX , streaming chanend sc_QE2CDC  , struct QE_t* unsafe QEptr , client interface GUI_supervisor_interface supervisor_data );
 unsafe void resetPointers(XUD_buffers_t &buffer);
 
 #endif /* USB_SERVER_H_ */

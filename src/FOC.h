@@ -16,7 +16,9 @@
 #define PWM_MAX 37000
 #define PWM_MIN ((PWM_MAX*5)/100) // 5%
 
-#define dV_LIMIT 8 //Smaller value gives lower dV/dt
+//Warning a value of 8 has broken 2 gatedriver ICs!
+#define dV_LIMIT 2 //Smaller value gives lower rate of change in the spacevector magnitude
+
 
 struct state_t{
     s64 y1;

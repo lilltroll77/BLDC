@@ -35,7 +35,7 @@ void setBits(client interface GUI_supervisor_interface supervisor , struct bitfi
 }
 
 //cdc data is queued on a FIFO
-unsafe void cdc_handler1(client interface cdc_if cdc , client interface GUI_supervisor_interface supervisor  , streaming chanend c_from_FOC , streaming chanend c_from_RX, chanend c_ep_in[],XUD_buffers_t * unsafe buff){
+unsafe void cdc_handler1(client interface cdc_if cdc , client interface GUI_supervisor_interface supervisor  , streaming chanend c_from_FOC , streaming chanend c_from_RX, streaming chanend c_from_QE , chanend c_ep_in[],XUD_buffers_t * unsafe buff){
     set_core_high_priority_off();
     XUD_Result_t result;
     int buffer_writing2host=InEPready;
@@ -199,6 +199,10 @@ unsafe void cdc_handler1(client interface cdc_if cdc , client interface GUI_supe
                      Vout *=(PWM_MAX-PWM_MIN)/100;
                      c_from_FOC <: PWMmod;
                      c_from_FOC <: Vout;
+                     break;
+                 case QEtrim:
+                     int angle = *buff->rx.read1++;
+                     c_from_QE <: angle;
                      break;
                  case DRV_IDRIVE_P_HS:
                      struct bitfield_t bitfield;
