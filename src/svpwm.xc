@@ -59,9 +59,9 @@ set_core_high_priority_on();
         p_svm @ t<: svm->zero;
         t += svm->t_after;
 
-        p_trigger <:0;
+        //p_trigger <:0;
         c :> svm;
-        p_trigger@t <:1;
+        //p_trigger@t <:1;
         //printintln(svm->t0);
 
         } // while

@@ -30,9 +30,10 @@ unsafe void SVM(streaming chanend c_in , streaming chanend c_out ){
         char phaseB;
         char phaseC;
     };
-    enum gate{HI_Z=0 , LO=1 , HI = 2};
+    enum gate{HI_Z=0 , LO=0b01 , HI = 0b10};
     //from https://en.wikipedia.org/wiki/Space_vector_modulation
 #define SV_LEN 9
+#define BRAKE (SV_LEN-2)
     struct SpaceVector_t SpaceVector[SV_LEN]=
     {
             { HI , LO , LO },  //1. A -> B&C
@@ -51,10 +52,10 @@ unsafe void SVM(streaming chanend c_in , streaming chanend c_out ){
     //Gatedriver & XMOS port8B format: See schematic
     for(int i=0; i< SV_LEN ; i++){
         lut[i] = (SpaceVector[i].phaseB) | (SpaceVector[i].phaseA<<2) | (SpaceVector[i].phaseC<<6);
-        //printhexln(lut[i]);
+        printf("%d: 0x%x\n",i,lut[i]);
     }
-    svm[0].zero = sin_tb[SV_LEN-1];
-    svm[1].zero = sin_tb[SV_LEN-1];
+    svm[0].zero = lut[BRAKE];
+    svm[1].zero = lut[BRAKE];
 
     double A = sqrt(3)*Tp * (1<<16);
        for(int i=0; i < sizeof(sin_tb)>>2  ; i++)
@@ -115,8 +116,8 @@ unsafe void SVM(streaming chanend c_in , streaming chanend c_out ){
 
         if(amp==0){
             //ADC will loose supply voltage if output is free floating
-            svm[buffer].p1 = lut[(SV_LEN-2)];
-            svm[buffer].p2 = lut[(SV_LEN-2)];
+            svm[buffer].p1 = lut[BRAKE];
+            svm[buffer].p2 = lut[BRAKE];
             svm[buffer].t1=100;
             svm[buffer].t2=100;
         }

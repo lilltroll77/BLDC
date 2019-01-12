@@ -23,15 +23,13 @@ struct bitfield_t{
 
 void setBits(client interface GUI_supervisor_interface supervisor , struct bitfield_t &field , short reg ){
     unsigned bitfield = (1<<field.length)-1;
-    unsigned mask = bitfield << field.startbit;
-    unsigned reg_data = supervisor.readGateDriver(reg) & bitfield;
-    reg_data |= (field.bitdata << field.startbit);
-    supervisor.writeGateDriver( reg , reg_data);
-    printhex(field.bitdata);
-    printchar(',');
-    printhex(reg_data);
-    printchar(',');
-    printhexln(mask);
+    unsigned mask = ~(bitfield << field.startbit);
+    unsigned old_data = supervisor.readGateDriver(reg);
+    unsigned new_data = old_data & mask;
+    new_data |= (field.bitdata << field.startbit);
+    supervisor.writeGateDriver( reg , new_data);
+    printf("Reg=%d, Data=0x%x , old_reg=0x%x , new_reg=0x%x , mask=0x%x\n" ,reg, field.bitdata , old_data , new_data , mask&0xFFF);
+
 }
 
 //cdc data is queued on a FIFO

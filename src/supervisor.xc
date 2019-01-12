@@ -8,6 +8,7 @@
 #include <xs1.h>
 #include <xclib.h>
 #include <print.h>
+#include <stdio.h>
 #include "typedefs.h"
 #include "one_wire.h"
 #include "supervisor.h"
@@ -215,7 +216,7 @@ void supervisor(server interface GUI_supervisor_interface supervisor_data , clie
                 WriteToDRV8320S( reg , val , spi_r, ctrl); // OCP PWM3
                 int readback = ReadFromDRV8320S(reg , spi_r, ctrl);
                 if(readback != val)
-                    printstrln("Error in SPI com. to TI gatedriver");
+                    printf("Error in SPI data to TI gatedriver. Wrote 0x%x , Read 0x%x" , val , readback);
                 ack=1;
                 break;
         case supervisor_data.resetGateDriver() -> int ack:
