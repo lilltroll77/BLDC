@@ -10,6 +10,7 @@
 #include "typedefs.h"
 
 #define CALIBRATE_QE 0
+#define FOC_MODE 1
 //The value that corresponds to 1A
 #define AMPERE 1<<15; // 1<<20 => 32A / clipped peak value
 

@@ -31,8 +31,8 @@ struct hispeed_vector_t{
     int IC[PKG_SIZE/4];
     int Torque[PKG_SIZE/4];
     int Flux[PKG_SIZE/4];
-    int U[PKG_SIZE/4];
-    int angle[PKG_SIZE/4];
+    int U[PKG_SIZE/4]; //output magnitude
+    int angle[PKG_SIZE/4]; //output angle
 };
 
 struct USBmem_t{

@@ -20,6 +20,7 @@ struct hispeed_t{
     int Flux;
     int U;
     int angle;
+    int DSPload;
    };
 
 
@@ -35,7 +36,6 @@ struct fuse_t{
 };
 
 struct sharedMem_t{
-    unsigned CPUload;
     struct DSPmem_t dsp[2];
 };
 

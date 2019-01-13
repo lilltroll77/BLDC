@@ -11,7 +11,7 @@
 #include "FOC.h"
 #include "QE.h"
 
-#define QE_RES 8192
+
 #define DIRECTION (-1) // Can be 1 or (-1)
 
 //Set this value to 0 during first calibration run
@@ -19,10 +19,20 @@
 #define UP   (QEdata.angle+DIRECTION)&(QE_RES-1)
 #define DOWN (QEdata.angle-DIRECTION)&(QE_RES-1)
 
-#define FOC_SECTORS 6
 
-int translate(int fi){
-    return ((FOC_SECTORS*7)*fi)%(FOC_SECTORS*8192)>>3;
+int sin_tb[QE_RES+QE_RES/(4*MOTOR_MAG)];
+
+void translate(int fi , streaming chanend c){
+    int fi_out = ((FOC_SECTORS*MOTOR_MAG)*fi)%(FOC_SECTORS*QE_RES)>>3;
+    int si = sin_tb[fi];
+    fi += QE_RES/(4*MOTOR_MAG); // ADD 90 deg
+    int co = sin_tb[fi];
+    //master
+    {
+        c<: fi_out;
+        c<: si; // sin(fi)
+        c<: co; // cos(fi)
+    }
 }
 
 void QE(streaming chanend c , streaming chanend c_fromCDC , in port pA , in port pB , in port pX , clock clk , struct QE_t &QEdata){
@@ -33,9 +43,9 @@ void QE(streaming chanend c , streaming chanend c_fromCDC , in port pA , in port
     set_port_clock(pB , clk);
     start_clock(clk);
 
-    int sin_tb[QE_RES];
-    for(int i=0; i<QE_RES ; i++)
-        sin_tb[i]=(double)0x7FFFFFFF*sin(2*M_PI *(double)i/QE_RES);
+
+    for(int i=0; i<sizeof(sin_tb)/sizeof(int) ; i++)
+        sin_tb[i]=(double)0x7FFFFFFF*sin(MOTOR_MAG*2*M_PI *(double)i/QE_RES);
 
     int A=0,B=0,X=0;
     QEdata.angle=0; // Reference angle
@@ -57,7 +67,7 @@ void QE(streaming chanend c , streaming chanend c_fromCDC , in port pA , in port
             if(trigged)
                 c<:QEdata.angle;
 #else
-                c<: translate(QEdata.angle);
+                translate(QEdata.angle , c);
 #endif
             break;
         case pB when pinsneq(B) :> B:
@@ -70,7 +80,7 @@ void QE(streaming chanend c , streaming chanend c_fromCDC , in port pA , in port
             if(trigged)
                 c<:QEdata.angle;
 #else
-                c<: translate(QEdata.angle);
+                translate(QEdata.angle , c);
 #endif
             //printint(QEdata.angle);
             break;
@@ -99,18 +109,7 @@ void QE(streaming chanend c , streaming chanend c_fromCDC , in port pA , in port
          case c_fromCDC :> int trim:
              refAngle = (QE_RES-QE_OFFSET)+ trim;
              break;
-    /*    case sinct_byref(c , ct):
-            if(ct){
-                c<:QEdata.angle;
-                break;
-            }
-            int a = QEdata.angle;
-            c<: sin_tb[a]; // sin(fi)
-            a = (QEdata.angle +(QE_RES/4)) & (QE_RES-1);
-            c<: sin_tb[a]; // cos(fi)
 
-        break;
-        */
         }
 
     }

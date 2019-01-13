@@ -7,6 +7,7 @@
 
 #include "svm.h"
 #include "xs1.h"
+#include "xclib.h"
 #include "typedefs.h"
 #include <xscope.h>
 #include "stdio.h"
@@ -17,22 +18,59 @@
 #include "cdc_handlers.h"
 #include "FOC.h"
 #include "RX_block.h"
+#include "math.h"
+#include "QE.h"
 
 #define DEBUG 0
 
 extern void wait(unsigned clk);
 
+
+
+#define SQRT_BITS 14
+#define SQRT_LEN (1<<SQRT_BITS)
+#define ARCTAN_BITS 7
+#define ARCTAN_LEN (1+(1<<ARCTAN_BITS))
+
+unsigned short sqrt_tb[SQRT_LEN];
+
+// sqrt(A*2^(2n)) = 2^n * sqrt(A)
+static inline
+unsigned sqrt_fixed(unsigned x){
+    if(x==0)
+        return 0;
+    int zeros = clz(x);
+    //Normalize to full scale
+    x <<= zeros;
+    //extract most SQRT_BITS and map to table
+    x >>= (31-SQRT_BITS);
+    x -=(SQRT_LEN);
+    //Table lookup and shift with zeros/2
+    if( x>= SQRT_LEN){
+        printstr("SQRT: ");
+        printintln(x);
+     while(1);
+    }
+    x=sqrt_tb[x]>>(zeros>>1);
+    unsigned _;
+    if(zeros&1) // if zeros has an reminder divide by 1/sqrt(2)
+        {x,  _}=lmul(x , 3037000500 ,0 ,0x80000000);
+    return x;
+
+
+}
+
 unsafe void gui_server(streaming chanend c_from_RX , streaming chanend c_from_dsp){
     set_core_high_priority_off();
-    struct sharedMem_t* unsafe shared_mem;
     unsigned CPUload=0;
     struct hispeed_t* unsafe fast;
     #pragma unsafe arrays
 
-    c_from_dsp :> shared_mem;
     int fuse_current= 33*AMPERE; //32 [A] default
     fuse_current = 0x7FFFFFFF;
     char fuse_state=1;
+
+
 
     timer tmr;
     unsigned time;
@@ -68,9 +106,8 @@ unsafe void gui_server(streaming chanend c_from_RX , streaming chanend c_from_ds
                 absIA = absIB;
             if(absIA < absIC)
                 absIA = absIC;
-            unsigned newLoad = shared_mem->CPUload & 2047;
-            if( newLoad > CPUload)
-                    CPUload = newLoad;
+            if( fast->DSPload > CPUload)
+                    CPUload = fast->DSPload;
          // send to other tile
 /*1*/   c_from_RX <: sample; sample = (sample+1)& (FFT_LEN-1);
 /*2*/   c_from_RX <: fast->IA;
@@ -99,13 +136,10 @@ unsafe void gui_server(streaming chanend c_from_RX , streaming chanend c_from_ds
 
 
 static inline
-void writeCPUloadNow(unsigned &t_old , timer tmr , unsigned* mem){
-    //struct hispeed_t* offset=0;
-    //const unsigned* pos = &offset->CPUload;
+void writeCPUloadNow(unsigned t_old , timer tmr , unsigned* mem){
     unsigned t_new;
     tmr :> t_new;
     asm("stw %0 , %1[%2]" :: "r"(t_new-t_old), "r"(mem) , "r"(0));
-    tmr :> t_old;
 }
 
 static inline
@@ -120,6 +154,8 @@ int PI(int x, int p , int i , int &hi , unsigned &lo){
     return h+hi;
 }
 
+#define  ldivu(a,b,c,d,e) asm("ldivu %0,%1,%2,%3,%4" : "=r" (a), "=r" (b): "r" (c), "r" (d), "r" (e))
+
 
 unsafe void FOC(streaming chanend c_I[2] , streaming chanend c_fi , streaming chanend c_out , streaming chanend c_gui_server , streaming chanend c_from_CDC){
     struct sharedMem_t shared_mem;
@@ -131,6 +167,21 @@ unsafe void FOC(streaming chanend c_I[2] , streaming chanend c_fi , streaming ch
     memset( state , 0 , sizeof(state));
     memset( Int   , 0 , sizeof(Int));
     memset( reg , 0 , sizeof(reg));
+    //Calculate square root table with 16 bit resolution
+        for(unsigned i=0; i< SQRT_LEN ; i++){
+                double x= 1.0+(double)i /SQRT_LEN; //[1 2]
+               sqrt_tb[i] = sqrt(x*pow(2,31)); //[sqrt(2) 2]<<15
+
+           }
+    short arctan[ARCTAN_LEN];
+    short arccot[ARCTAN_LEN];
+    const double a_scale = (QE_RES/8)/MOTOR_MAG*4.0/M_PI;
+    for(unsigned i=0; i< ARCTAN_LEN ; i++){
+        arctan[i] = a_scale*atan((double)i/ARCTAN_LEN);
+        arccot[i] = a_scale*(M_PI_2-atan((double)i/ARCTAN_LEN));
+    }
+
+
     for(int i=0; i<2 ; i++){
         for(int j=0; j<2 ; j++)
             reg[i].EQ[j].shift = -1; //Disable all filters
@@ -213,7 +264,9 @@ do{
             }
         break;
         case c_fi:> fi:
-        break;
+             c_fi:> int _;
+             c_fi:> int _;
+            break;
         case c_I[0]:> i:
             i = abs(i);
             if((i > iMax_init)){ // Increase voltage until current = Imax
@@ -242,13 +295,16 @@ do{
     char ct_fuse=fuse_GOOD;
     samples=0;
 #if(CALIBRATE_QE)
-    printstrln("Searching for trigger");
-    int QEmean=0;
+    printstrln("Searching for QE trigger");
+    int QEmean=0 , trigged=0;
+#else
+    VoutSet=0;
 #endif
     int fuse=1;
+    int cos_fi , sin_fi;
 
 
-    VoutSet=0;
+
         while(1){
         select{
            case sinct_byref(c_gui_server , ct_fuse):
@@ -267,7 +323,7 @@ do{
 
             break;
 #if(CALIBRATE_QE)
-           case c_out:> fi_FOC: // new calc requested
+           case c_out:> int fi_FOC: // new calc requested
             //writeCPUloadNow( told , tmr1,  &shared_mem.CPUload);
 
             if(samples==0){
@@ -287,83 +343,85 @@ do{
             else
                 samples--;
             c_out <: fi_FOC;
-            c_out <: VoutSet>>SHIFT_OUT;
+            c_out <: VoutSet;
+            break;
 #else
            case c_out:>int _:
+               tmr:>t;
+               if(Vout < VoutSet)
+                   Vout += dV_LIMIT;
+               else if(Vout > VoutSet)
+                   Vout -=dV_LIMIT;
+               if(Vout<0){
+                   c_out <: fi-FOCangle;
+                   c_out <: -Vout + PWM_MIN;
+               }else if(Vout>0){
+                   c_out <: fi+FOCangle;
+                   c_out <: Vout + PWM_MIN;
+               }
+               else{
+                   c_out <: fi;
+                   c_out <: 0;
+               }
+                     //Transform input signals to direct quadrature
+               unsigned _lo;
+               int Beta;
+               //BETA = (ib-ic)/sqrt(3);
+               int scale = 1239850262;//2*(ib-ic)*(2^31/sqrt(3))
+               /* 2*(ib - ic) = 2*(-(ia+ic)-ic) = -2*(ia + 2*ic) */
+               int i =-2*(mem->IA + 2*mem->IC);
+               {Beta , _lo} = macs(i, scale , 0 , 0x80000000);
 
-            if(Vout < VoutSet)
-                Vout += dV_LIMIT;
-            else if(Vout > VoutSet)
-                Vout -=dV_LIMIT;
-            if(Vout<0){
-                c_out <: fi-FOCangle;
-                c_out <: -Vout + PWM_MIN;
-            }else if(Vout>0){
-                c_out <: fi+FOCangle;
-                c_out <: Vout + PWM_MIN;
-            }
-            else{
-                c_out <: fi;
-                c_out <: 0;
-            }
+               unsigned hi=0 , lo=0x80000000;
+               {hi , lo} = macs(mem->IA , cos_fi , hi , lo);
+               {hi , lo} = macs(Beta    , sin_fi , hi , lo);
+               mem->U = hi*hi;
+               mem->Flux = hi;
+               //Id = PI( VoutSet - Id , reg[0].P , reg[0].I , Int[0].hi , Int[0].lo);
 
+               lo=0x80000000;
+               hi=0;
+               {hi , lo} = macs(Beta    , cos_fi , hi , lo);
+               {hi , lo} = macs(mem->IA ,-sin_fi , hi , lo);
+               mem->U += hi*hi;
+               mem->Torque = hi;
 
+               mem->U = sqrt_fixed(mem->U);
+               unsigned flux = 1+abs(mem->Flux);
+               unsigned torque = 1+abs(mem->Torque);
+               if(flux > torque){
+                   unsigned q=(torque<<ARCTAN_BITS)/flux;
+                   if(q>=ARCTAN_LEN){
+                       printint(q);
+                       while(1);
+                   }
+                   mem->angle = arctan[q];
+               }else{
+                   unsigned q=(flux<<ARCTAN_BITS)/torque;
+                   if(q>=ARCTAN_LEN){
+                       printint(q);
+                       while(1);
+                   }
+                   mem->angle = arccot[q];
+               }
+               if(mem->Torque < 0)
+                   mem->angle =-mem->angle;
 
-
+               unsigned t_new;
+               tmr :> t_new;
+               mem->DSPload = t_new-t;
+               break;
+                  case c_fi:> fi:
+                      c_fi:> sin_fi;
+                      c_fi:> cos_fi;
+                 break;
 #endif
-
-/*
-            c_out <: fi + FOCangle;
-            c_out <: VoutSet;
-            samples++;
-
-            if((samples& 0xF) ==0){
-               if(VoutSet<0x7FFF)
-                    VoutSet++;
-
-            }
-*/
-            //c_out <: mem;
-            //Scale from QE angle to Space vector angle
-
-            //(B – C)*(1/sqrt(3) = -(A+C)-C /sqrt(3) = (-2*A - 4C)*0.288675134594813
- /*           int Beta;
-            unsigned _lo;
-            {Beta , _lo} = macs(-2*mem->IA - 4*mem->IC, 1239850262 , 0 , 0x80000000);
-            int cos_fi , sin_fi;
-            c_fi:> sin_fi;
-            c_fi:> cos_fi;
-
-            int Id , Iq;
-            unsigned Id_lo , Iq_lo;
-
-            {Id , Id_lo} = macs(mem->IA , cos_fi , 0 , 0x80000000);
-            {Id , Id_lo} = macs(Beta    , sin_fi , Id , Id_lo);
-
-            Id = PI( 5000 - Id , reg[0].P , reg[0].I , Int[0].hi , Int[0].lo);
-
-
-            {Iq , Iq_lo} = macs(Beta    , cos_fi , 0 , 0x80000000);
-            {Iq , Iq_lo} = macs(mem->IA ,-sin_fi , Iq , Iq_lo);
-
-            Iq = PI( - Iq , reg[1].P , reg[1].I , Int[1].hi , Int[1].lo);
-
-            int alfa;
-            unsigned alfa_lo;
-            {alfa , alfa_lo} = macs(Id ,  cos_fi , 0 , 0x80000000);
-            {alfa , alfa_lo} = macs(Iq , -sin_fi  ,  alfa , alfa_lo);
-            //sqrt(alfa);
-*/
-            /* DSP END */
-            //writeCPUloadNow( told , tmr1,  &shared_mem.CPUload);
-
-        break;
-           case c_fi:> fi:
 #if(CALIBRATE_QE)
+            case c_fi:> fi:
             if(!trigged & (fi==0)){
                printstrln("QE trigger found. Testing magnetic sectors");
-               printstrln("DO NOT ATTACH ANY LOAD TO MOTOR!");
-               printstrln("WARNING: Motor might get hot! Manual supervision needed");
+               printstrln("Motor must run freely!");
+               printstrln("WARNING: Motor coils might get hot! Manual supervision needed");
                trigged=1;
             }
 #endif
