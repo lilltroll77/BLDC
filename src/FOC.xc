@@ -202,11 +202,14 @@ unsafe void FOC(streaming chanend c_I[2] , streaming chanend c_fi , streaming ch
     int VoutSet = 0;
     int Vout=0;
     int FOCangle=0;
-    const int AMPS = 3;
-    const int iMax_init=AMPS*AMPERE;
-    if(iMax_init > 25*(1<<15)){
-        printf("Incorrect current settings\n Limit will clip in ADC\nABORTING!\n");
-        while(1);
+
+
+
+    int iMax_init=(TEST_mA*AMPERE)/1000;
+    if(iMax_init > 24<<15){
+        iMax_init = (24<<15);
+        printf("! Warning: Testcurrent reduced to %d mA to avoid ADC clipping !\n" , (1000*iMax_init)/AMPERE);
+
     }
 
     soutct(c_I[0] , 0); //start adc
@@ -256,8 +259,8 @@ do{
         else
             sumC--;
         break;
-        case tmr when timerafter(t + 5e8):>t:
-            printf("ADC did not stabalize within 5s!\niAoffset=%d , iCoffset=%d after compensation\n !! ABORTING!! myMachine.h needs to be adjusted", iAmean , iCmean);
+        case tmr when timerafter(t + 3e8):>t:
+            printf("ADC did not stabalize within 3s!\niAoffset=%d , iCoffset=%d after compensation\n !! ABORTING!! ADC offset values in myMachine.h needs to be adjusted\n", iAmean , iCmean);
             while(1);
         break;
         }
@@ -267,7 +270,7 @@ tmr :> tend;
 int ms=100*1000;
 printf("ADC did stabalize after %d ms with an compensated iAoffset=%d and iCoffset=%d\n!!! ALWAYS PRESS THE STOP SWITCH BEFORE STOPPING PROGRAM EXECUTION !!!\n\n",(tend-t)/ms ,iAmean , iCmean);
 #if(!CALIBRATE_QE)
-printf("Now waiting for an input commands from the GUI!\n\n");
+printf("Now waiting for an input command from the GUI!\n\n");
 #endif
     //Force motor to FOCangle=0 position with a DC current
 

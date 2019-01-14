@@ -21,6 +21,10 @@
 //The ADC output for 1A current
 #define AMPERE (ADC_0Amp/Imax) //
 
+//TEST current for calibration, and for finding FOC sector 0.
+//3A works well for a 1.2Ohm motor. Higher value gives better accuracy.
+#define TEST_mA 3000 //[mA]
+
 
 //ADC offsets
 #define ADC_OFFSET_A (ADC_0Amp - 940)
