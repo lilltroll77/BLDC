@@ -11,13 +11,17 @@
 //Set to one for calibrating your QE and ADC
 #define CALIBRATE_QE 0
 
+//Current sense resistor in mOhm
 #define Rsense 2 //mOhm or +-32A (25A linear)
-//The ADC output for 1A current
-//Peak to peak value = 1<<21
-#define AMPERE (Rsense<<14) //
-
-//ADC output at 0 amp
+// U = R*I | Umax=+-64mV
+#define Imax (64/Rsense) // [A]
+//ADC output value at 0 amps after decimation
 #define ADC_0Amp (1<<20)
+
+//The ADC output for 1A current
+#define AMPERE (ADC_0Amp/Imax) //
+
+
 //ADC offsets
 #define ADC_OFFSET_A (ADC_0Amp - 940)
 #define ADC_OFFSET_C (ADC_0Amp - 1300)

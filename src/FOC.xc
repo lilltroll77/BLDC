@@ -265,8 +265,10 @@ do{
 unsigned tend;
 tmr :> tend;
 int ms=100*1000;
-printf("ADC did stabalize after %d ms with an compensated iAoffset=%d and iCoffset=%d\nWaiting for input commands from GUI!\n\n!!! ALWAYS PRESS THE STOP SWITCH BEFORE STOPPING PROGRAM EXECUTION !!!\n\n",(tend-t)/ms ,iAmean , iCmean);
-
+printf("ADC did stabalize after %d ms with an compensated iAoffset=%d and iCoffset=%d\n!!! ALWAYS PRESS THE STOP SWITCH BEFORE STOPPING PROGRAM EXECUTION !!!\n\n",(tend-t)/ms ,iAmean , iCmean);
+#if(!CALIBRATE_QE)
+printf("Now waiting for an input commands from the GUI!\n\n");
+#endif
     //Force motor to FOCangle=0 position with a DC current
 
 
