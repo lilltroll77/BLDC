@@ -14,7 +14,7 @@
 //Current sense resistor in mOhm
 #define Rsense 2 //mOhm or +-32A (25A linear)
 // U = R*I | Umax=+-64mV
-#define Imax (64/Rsense) // [A]
+#define Imax (64.0/Rsense) // [A]
 //ADC output value at 0 amps after decimation
 #define ADC_0Amp (1<<20)
 

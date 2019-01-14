@@ -205,10 +205,10 @@ unsafe void FOC(streaming chanend c_I[2] , streaming chanend c_fi , streaming ch
 
 
 
-    int iMax_init=(TEST_mA*AMPERE)/1000;
+    unsigned iMax_init=(TEST_mA/1000.0)*AMPERE;
     if(iMax_init > 24<<15){
         iMax_init = (24<<15);
-        printf("! Warning: Testcurrent reduced to %d mA to avoid ADC clipping !\n" , (1000*iMax_init)/AMPERE);
+        printf("! Warning: Testcurrent reduced from %d mA to %.1f mA to avoid ADC clipping !\n" ,TEST_mA ,(1000.0*iMax_init)/AMPERE);
 
     }
 
