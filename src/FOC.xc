@@ -19,7 +19,7 @@
 #include "FOC.h"
 #include "RX_block.h"
 #include "math.h"
-#include "QE.h"
+#include "myMachine.h"
 
 #define DEBUG 0
 
@@ -216,33 +216,56 @@ unsafe void FOC(streaming chanend c_I[2] , streaming chanend c_fi , streaming ch
 
 timer tmr;
 unsigned t;
-tmr :> t;
+
 // Charge ADC rail and wait for ADC stabilization
-int samples=3e4;
-const int Ierror = 1e3; //Maximum error allowed after stab.
+int samples=6e4;
+const int Ierror = 500; //Maximum error allowed after stab.
+int iA=0x80000000 , iC=0x80000000;
+int iAsum=0; int iCsum=0;
+int iAmean=2*Ierror , iCmean=2*Ierror;
+#define SUM_LEN 4096
+int sumA=SUM_LEN;
+int sumC=SUM_LEN;
+tmr :> t;
 do{
         char ct;
-        int iA=0x80000000 , iC=0x80000000;
         select{
         case c_out :> int _:
             c_out <: 0;
             c_out <: 0;
-            if((iA < Ierror) & (iC < Ierror))
+            if((abs(iAmean) < Ierror) & (abs(iCmean) < Ierror))
                 samples--;
         break;
         case c_I[0]:> iA:
-            iA = abs(iA);
+        iAsum +=iA;
+        if(sumA==0){
+            iAmean = iAsum/SUM_LEN;
+            sumA=SUM_LEN;
+            iAsum=0;
+        }
+        else
+            sumA--;
         break;
         case c_I[1]:> iC:
-            iC = abs(iC);
+        iCsum +=iC;
+        if(sumC==0){
+            iCmean = iCsum/SUM_LEN;
+            sumC=SUM_LEN;
+            iCsum=0;
+        }
+        else
+            sumC--;
         break;
         case tmr when timerafter(t + 5e8):>t:
-            printf("ADC did not stabalize within 5s!\niA=%d , iC=%d \n !! ABORTING!!", iA , iC);
+            printf("ADC did not stabalize within 5s!\niAoffset=%d , iCoffset=%d after compensation\n !! ABORTING!! myMachine.h needs to be adjusted", iAmean , iCmean);
             while(1);
         break;
         }
     }while(samples!=0);
-    printstrln("ADC OK");
+unsigned tend;
+tmr :> tend;
+int ms=100*1000;
+printf("ADC did stabalize after %d ms with an compensated iAoffset=%d and iCoffset=%d\nWaiting for input commands from GUI!\n\n!!! ALWAYS PRESS THE STOP SWITCH BEFORE STOPPING PROGRAM EXECUTION !!!\n\n",(tend-t)/ms ,iAmean , iCmean);
 
     //Force motor to FOCangle=0 position with a DC current
 
@@ -422,6 +445,8 @@ do{
                printstrln("QE trigger found. Testing magnetic sectors");
                printstrln("Motor must run freely!");
                printstrln("WARNING: Motor coils might get hot! Manual supervision needed");
+               printstrln("Press the stop switch to stop the motor test currents");
+               printstrln("Finally write the 'mean QE_OFFSET value' to myMachine.h");
                trigged=1;
             }
 #endif

@@ -8,9 +8,6 @@
 #ifndef QE_H_
 #define QE_H_
 
-#define QE_RES 8192
-#define FOC_SECTORS 6
-#define MOTOR_MAG 7
 
 
 struct QE_t{

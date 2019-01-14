@@ -10,11 +10,9 @@
 #include <print.h>
 #include "FOC.h"
 #include "QE.h"
+#include "myMachine.h"
 
 
-#define DIRECTION (-1) // Can be 1 or (-1)
-
-#define QE_OFFSET 408
 #define UP   (QEdata.angle+DIRECTION)&(QE_RES-1)
 #define DOWN (QEdata.angle-DIRECTION)&(QE_RES-1)
 

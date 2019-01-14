@@ -19,12 +19,12 @@
 #include "FOC.h"
 #include "QE.h"
 #include "decimate.h"
+#include "myMachine.h"
 
 
 extern void wait(unsigned clk);
 
-#define ADC_OFFSET_A ((1<<20)-700)
-#define ADC_OFFSET_C ((1<<20)-1700)
+
 
 int main(){
     streaming chan c_Idata[2], c_QE, c_FOC,c_svm , sc_QE2CDC;

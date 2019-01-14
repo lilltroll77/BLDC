@@ -9,10 +9,7 @@
 #define FOC_H_
 #include "typedefs.h"
 
-#define CALIBRATE_QE 0
 #define FOC_MODE 1
-//The value that corresponds to 1A
-#define AMPERE 1<<15; // 1<<20 => 32A / clipped peak value
 
 #define PWM_MAX 37000
 #define PWM_MIN ((PWM_MAX*5)/100) // 5%
